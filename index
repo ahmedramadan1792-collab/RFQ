@@ -1,0 +1,1693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1a73e8">
+<title>RFQ Smarter | Workspace</title>
+<link id="appFavicon" rel="icon" type="image/png">
+<link id="appleTouchIcon" rel="apple-touch-icon">
+<link id="manifestLink" rel="manifest">
+
+<!-- Modern UI Font (Inter) & App Name Font (Montserrat) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  /* Google AI Studio Inspired Palette */
+  --primary: #1a73e8;
+  --primary2: #1557b0;
+  --dark: #202124;
+  --accent: #8ab4f8;
+  --accent-text: #174ea6;
+  --bg-sidebar: #f8f9fa;
+  --surface: #ffffff;
+  --border: #dadce0;
+  --text: #3c4043;
+  --muted: #5f6368;
+  --danger: #d93025;
+  --ok: #1e8e3e;
+  --warn: #f29900;
+  --shadow-sm: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+  --shadow-subtle: 0 1px 3px rgba(0,0,0,0.04);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--surface); color: var(--text); font-size: 13px; -webkit-font-smoothing: antialiased; }
+.hidden { display: none !important; }
+button, input, select, textarea { font: inherit; }
+
+/* ---- SIGN-IN (Matches the Attached Screenshot) ---- */
+.signin { position: fixed; inset: 0; display: grid; place-items: center; background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); z-index: 50; padding: 18px; }
+.signin-card { width: min(440px, 96vw); background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.4); }
+.signin-head { padding: 48px 30px 24px; text-align: center; background: var(--surface); border-bottom: 1px solid var(--border); }
+.signin-logo-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 24px; }
+.signin-logo-img { width: 100%; max-width: 300px; height: auto; max-height: 95px; object-fit: contain; }
+.signin-title { font-family: 'Montserrat', sans-serif; color: var(--dark); font-size: 26px; font-weight: 900; letter-spacing: -0.5px; margin-bottom: 8px; }
+.signin-sub { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+.signin-body { padding: 36px 40px 48px; background: #fafbfc; }
+
+.label { display: block; margin: 0 0 8px; color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+.input, .select, .textarea { width: 100%; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); padding: 12px 14px; font-weight: 500; outline: none; transition: 0.2s; }
+.textarea { min-height: 80px; resize: vertical; line-height: 1.5; }
+.input:focus, .select:focus, .textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,115,232,.15); }
+.form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.field { min-width: 0; }
+.span2 { grid-column: 1 / -1; }
+
+.btn { border: 1px solid var(--border); background: #fff; color: var(--text); border-radius: 8px; padding: 10px 16px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; justify-content: center; transition: 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+.btn:hover { background: #f1f3f4; color: var(--dark); }
+.btn.primary { border: 0; color: #fff; background: var(--primary); box-shadow: 0 2px 6px rgba(26,115,232,.25); }
+.btn.primary:hover { background: var(--primary2); box-shadow: 0 4px 12px rgba(26,115,232,.35); transform: translateY(-1px); color: #fff; }
+.btn.accent { border: 1px solid transparent; color: var(--accent-text); background: #e8f0fe; }
+.btn.accent:hover { background: #d2e3fc; }
+.btn.danger { color: var(--danger); border-color: #fad2cf; background: #fce8e6; }
+.btn.danger:hover { background: #fad2cf; }
+.btn.warn { border: 1px solid transparent; color: #b06000; background: #fef0db; }
+.btn.warn:hover { background: #fde2b4; }
+.btn.sm { padding: 6px 12px; font-size: 12px; border-radius: 6px; }
+.signin .btn { width: 100%; padding: 14px; margin-top: 24px; font-size: 14px; border-radius: 8px; }
+.error { display: none; margin-top: 16px; background: #fce8e6; color: var(--danger); border: 1px solid #fad2cf; border-radius: 6px; padding: 12px; text-align: center; font-weight: 500; font-size: 13px; }
+
+/* ---- APP LAYOUT ---- */
+.app-layout { display: flex; height: 100vh; overflow: hidden; background: var(--surface); }
+.sidebar { width: 260px; background: var(--bg-sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 30; }
+.sidebar-brand { padding: 24px 20px; display: flex; align-items: center; gap: 12px; }
+.sidebar-logo-icon { width: 32px; height: 32px; border-radius: 8px; object-fit: contain; flex-shrink: 0; }
+.sidebar-brand .brand-title { font-family: 'Montserrat', sans-serif; font-size: 16px; font-weight: 800; color: var(--dark); letter-spacing: -0.3px; line-height: 1.2; }
+.sidebar-brand .brand-sub { font-size: 10px; color: var(--primary); font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; margin-top: 2px; }
+
+.nav { display: flex; flex-direction: column; gap: 2px; padding: 12px; flex: 1; overflow-y: auto; }
+.tab { border: 0; background: transparent; border-radius: 24px; color: var(--muted); padding: 10px 16px; font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 12px; text-align: left; }
+.tab svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: 0.2s; }
+.tab:hover { color: var(--dark); background: rgba(0,0,0,0.04); }
+.tab.active { color: var(--primary); background: #e8f0fe; font-weight: 700; }
+.tab.active svg { color: var(--primary); }
+
+.main-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+main { flex: 1; overflow-y: auto; padding: 32px; background: var(--surface); }
+.topbar { position: sticky; top: 0; z-index: 20; height: 64px; background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; }
+.topbar-logo { display: flex; align-items: center; gap: 10px; }
+.topbar-logo-icon { width: 24px; height: 24px; border-radius: 4px; object-fit: contain; }
+.page-title { font-family: 'Montserrat', sans-serif; font-size: 18px; font-weight: 700; color: var(--dark); letter-spacing: -0.3px; display: flex; align-items: center; gap: 10px; }
+.header-actions { display: flex; align-items: center; gap: 16px; }
+.pill { background: #f1f3f4; color: var(--dark); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-weight: 600; font-size: 12px; }
+.date { color: var(--muted); font-weight: 500; font-size: 12px; }
+
+.view { display: none; }
+.view.active { display: block; animation: fade-in 0.2s ease-out; }
+@keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+.section-title { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--dark); font-size: 18px; margin: 0 0 20px; font-family: 'Montserrat', sans-serif; }
+.toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 0 0 20px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-subtle); padding: 24px; }
+.kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: var(--shadow-subtle); }
+.kpi-label { color: var(--muted); font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+.kpi-value { color: var(--primary); font-size: 32px; font-weight: 700; line-height: 1; letter-spacing: -1px; }
+
+.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+.chart-title { font-size: 13px; font-weight: 700; color: var(--dark); margin-bottom: 16px; font-family: 'Montserrat', sans-serif; }
+.bar-row { display: grid; grid-template-columns: 140px 1fr 38px; gap: 12px; align-items: center; margin: 12px 0; }
+.bar-label { font-weight: 500; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.bar-track { height: 8px; background: #f1f3f4; border-radius: 99px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 99px; background: var(--primary); }
+.bar-fill.accent { background: var(--accent); }
+.deadline { display: flex; justify-content: space-between; gap: 12px; align-items: center; background: var(--surface); border-radius: 8px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.deadline:last-child { border-bottom: 0; }
+.deadline strong { color: var(--dark); font-size: 13px; font-weight: 600; }
+.deadline small { display: block; color: var(--muted); font-weight: 400; margin-top: 4px; font-size: 12px; }
+.days { border-radius: 16px; padding: 4px 10px; font-weight: 600; font-size: 11px; }
+.days.bad { background: #fce8e6; color: var(--danger); }
+.days.warn { background: #fef0db; color: #b06000; }
+.days.ok { background: #e6f4ea; color: var(--ok); }
+.table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-subtle); }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+th { background: #f8f9fa; color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+td { padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 400; color: var(--text); }
+tr:hover td { background: #f8f9fa; }
+.wrap { white-space: normal; line-height: 1.5; }
+.badge { display: inline-flex; border-radius: 4px; padding: 4px 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; }
+.status-new { background: #e8f0fe; color: var(--accent-text); }
+.status-under { background: #fef0db; color: #b06000; }
+.status-submitted { background: #f3e8ff; color: #7e22ce; }
+.status-won { background: #e6f4ea; color: var(--ok); }
+.status-lost { background: #fce8e6; color: var(--danger); }
+.status-hold { background: #f1f3f4; color: var(--muted); }
+.split { display: grid; grid-template-columns: 420px 1fr; gap: 24px; align-items: start; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.supplier-list { max-height: 314px; overflow: auto; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+.supplier { border-bottom: 1px solid var(--border); padding: 12px 14px; cursor: pointer; transition: 0.2s; }
+.supplier:last-child { border-bottom: 0; }
+.supplier:hover { background: #f8f9fa; }
+.supplier.selected { background: #e8f0fe; }
+.supplier small { display: block; margin-top: 4px; color: var(--muted); font-family: 'Consolas', monospace; white-space: normal; word-break: break-word; font-size: 11px; }
+.pkg-chip { float: right; font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #f1f3f4; color: var(--muted); font-weight: 600; }
+.supplier.selected .pkg-chip { background: rgba(26,115,232,0.1); color: var(--accent-text); }
+.preview { min-height: 320px; max-height: 430px; overflow: auto; white-space: pre-wrap; background: #f8f9fa; border: 1px solid var(--border); border-radius: 8px; padding: 20px; line-height: 1.6; font-size: 13px; color: var(--dark); font-family: 'Consolas', monospace; }
+.file-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.file { display: flex; justify-content: space-between; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 12px; font-weight: 500; align-items: center; }
+.task-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.task-col { background: #f8f9fa; border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.task-head { display: flex; justify-content: space-between; border-bottom: 2px solid var(--border); padding-bottom: 12px; margin-bottom: 16px; font-weight: 700; color: var(--dark); font-size: 12px; letter-spacing: 0.3px; }
+.task-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 12px; box-shadow: var(--shadow-subtle); transition: 0.2s; }
+.task-card:hover { box-shadow: 0 4px 6px rgba(0,0,0,0.06); transform: translateY(-1px); }
+.task-title { font-weight: 600; margin-bottom: 6px; font-size: 13px; color: var(--dark); line-height: 1.4; }
+.meta { font-size: 11px; color: var(--muted); font-weight: 400; line-height: 1.5; }
+.quote-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.mini { font-size: 11px; color: var(--muted); font-weight: 400; margin-top: 4px; }
+
+/* Modals */
+.modal-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(32,33,36,0.6); backdrop-filter: blur(2px); z-index: 60; padding: 16px; }
+.modal-overlay.open { display: flex; }
+.modal { width: min(760px, 96vw); max-height: 92vh; overflow: auto; background: var(--surface); border-radius: 16px; box-shadow: 0 24px 38px 3px rgba(0,0,0,0.14), 0 9px 46px 8px rgba(0,0,0,0.12); border: 1px solid var(--border); }
+.modal-head { display: flex; justify-content: space-between; align-items: center; background: var(--surface); border-bottom: 1px solid var(--border); padding: 20px 24px; }
+.modal-title { font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 16px; color: var(--dark); }
+.modal-body { padding: 24px; }
+.close { background: transparent; border: 0; color: var(--muted); font-size: 24px; cursor: pointer; line-height: 1; transition: 0.2s; padding: 0; }
+.close:hover { color: var(--dark); }
+.actions { display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border); padding-top: 20px; margin-top: 24px; }
+
+/* ---- SETTINGS (Flatter UI Setup) ---- */
+.settings-page { display: flex; flex-direction: column; gap: 24px; }
+.settings-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-subtle); overflow: hidden; }
+.settings-section-head { display: flex; align-items: center; gap: 16px; padding: 20px 24px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.settings-section-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: #f8f9fa; border: 1px solid var(--border); }
+.settings-section-icon svg { width: 18px; height: 18px; fill: none; stroke: var(--dark); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.settings-section-title { font-weight: 700; color: var(--dark); font-size: 15px; }
+.settings-section-sub { font-size: 12px; color: var(--muted); font-weight: 400; margin-top: 4px; }
+.settings-section-body { padding: 24px; background: #fff; }
+.member-row, .lead-row, .vendor-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.member-row:last-child, .lead-row:last-child, .vendor-row:last-child { border-bottom: 0; }
+
+/* ---- SETTINGS GROUP HEADERS ---- */
+.settings-group-header { display: flex; align-items: center; gap: 12px; padding: 16px 0 6px; }
+.settings-group-header-line { flex: 1; height: 1px; background: var(--border); }
+.settings-group-header-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1.8px; white-space: nowrap; }
+
+/* ---- QUOTE COMPARISON PANEL ---- */
+.cmp-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-subtle); padding: 24px; margin-bottom: 24px; }
+.cmp-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-top: 20px; }
+.cmp-card { border: 2px solid var(--border); border-radius: 10px; padding: 20px; background: var(--surface); position: relative; transition: 0.2s; }
+.cmp-card:hover { box-shadow: var(--shadow-sm); }
+.cmp-card.best-overall { border-color: var(--primary); background: #f6f9fe; }
+.cmp-rank { position: absolute; top: -11px; left: 14px; font-weight: 700; font-size: 11px; padding: 3px 10px; border-radius: 99px; letter-spacing: 0.3px; }
+.cmp-rank.rank-best { background: var(--primary); color: #fff; }
+.cmp-rank.rank-other { background: #f1f3f4; color: var(--muted); border: 1px solid var(--border); }
+.cmp-vendor { font-weight: 700; font-size: 15px; color: var(--dark); margin: 10px 0 2px; }
+.cmp-origin { font-size: 11px; color: var(--muted); margin-bottom: 16px; font-weight: 500; }
+.cmp-field { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px; gap: 8px; }
+.cmp-field:last-of-type { border-bottom: 0; }
+.cmp-field-label { color: var(--muted); font-weight: 500; white-space: nowrap; }
+.cmp-field-val { font-weight: 700; color: var(--dark); text-align: right; }
+.cmp-field-val.cmp-best { color: var(--ok); }
+.cmp-field-val.cmp-warn { color: var(--warn); }
+.cmp-score-box { margin-top: 14px; text-align: center; background: #f8f9fa; border-radius: 8px; padding: 12px 8px; border: 1px solid var(--border); }
+.cmp-score-num { font-size: 26px; font-weight: 700; color: var(--primary); line-height: 1; }
+.cmp-score-label { font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 3px; }
+.cmp-notes { font-size: 11px; color: var(--muted); margin-top: 10px; font-style: italic; line-height: 1.4; border-top: 1px dashed var(--border); padding-top: 8px; }
+
+.toast { position: fixed; right: 24px; bottom: 24px; background: #323232; color: #fff; box-shadow: 0 3px 5px -1px rgba(0,0,0,.2), 0 6px 10px 0 rgba(0,0,0,.14); border-radius: 8px; padding: 14px 24px; font-weight: 500; font-size: 14px; opacity: 0; transform: translateY(10px); transition: .25s ease-out; z-index: 100; letter-spacing: 0.2px; }
+.toast.show { opacity: 1; transform: translateY(0); }
+.subtle { color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.5; }
+.empty { color: var(--muted); font-weight: 500; text-align: center; padding: 30px; background: #f8f9fa; border-radius: 8px; border: 1px dashed var(--border); }
+.toggleline { display: flex; gap: 10px; align-items: center; font-weight: 500; color: var(--dark); }
+.progress { height: 6px; background: #f1f3f4; border-radius: 99px; overflow: hidden; margin-top: 8px; }
+.progress span { display: block; height: 100%; background: var(--primary); border-radius: 99px; }
+
+/* Reminder / status badges in registry */
+.vendor-status-wrap { display: flex; align-items: center; gap: 8px; }
+.vendor-status-wrap select { flex: 1; max-width: 140px; padding: 6px 8px; font-size: 12px; }
+.remind-btn { padding: 6px 12px; font-size: 12px; border-radius: 4px; border: 1px solid #f29900; background: #fff; color: #b06000; cursor: pointer; font-weight: 600; transition: 0.2s; white-space: nowrap; }
+.remind-btn:hover { background: #fef0db; }
+
+/* Reminder Preview Modal */
+.reminder-modal-body { padding: 0; }
+.reminder-tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--surface); padding: 0 12px; }
+.reminder-tab-btn { padding: 16px 20px; background: transparent; border: 0; cursor: pointer; font-weight: 600; font-size: 13px; color: var(--muted); border-bottom: 3px solid transparent; transition: 0.2s; margin-bottom: -1px; }
+.reminder-tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+.reminder-tab-btn:hover:not(.active) { color: var(--dark); }
+.reminder-tab-content { display: none; padding: 24px; }
+.reminder-tab-content.active { display: block; }
+.reminder-preview-box { min-height: 240px; max-height: 400px; overflow: auto; white-space: pre-wrap; background: #f8f9fa; border: 1px solid var(--border); border-left: 4px solid var(--warn); border-radius: 8px; padding: 20px; line-height: 1.6; font-size: 13px; color: var(--dark); font-family: 'Consolas', monospace; }
+.reminder-textarea { width: 100%; min-height: 200px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--dark); padding: 14px; font-weight: 500; outline: none; transition: 0.2s; resize: vertical; font-family: 'Consolas', monospace; font-size: 13px; line-height: 1.6; }
+.reminder-textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(26,115,232,.15); }
+
+@media(max-width:1000px) {
+  .app-layout { flex-direction: column; }
+  .sidebar { width: 100%; border-right: 0; border-bottom: 1px solid var(--border); height: auto; }
+  .sidebar-brand { padding: 16px 20px; }
+  .nav { flex-direction: row; padding: 8px 16px; overflow-x: auto; white-space: nowrap; gap: 8px; }
+  .tab { padding: 8px 14px; white-space: nowrap; font-size: 12px; }
+  .main-wrapper { overflow-y: auto; }
+  main { padding: 20px; }
+  .topbar { padding: 0 20px; position: static; }
+  .split, .settings-group, .dash-grid, .kpis, .task-board, .quote-summary { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+  .span2 { grid-column: auto; }
+}
+</style>
+</head>
+<body>
+<div id="toast" class="toast"></div>
+
+<!-- EMBEDDED DEFAULT APP LOGO (AI Studio Style / Clean SVG) -->
+<script>
+const DEFAULT_LOGO_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' rx='40' fill='%231a73e8'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-family='Montserrat%2C Arial%2C sans-serif' font-weight='900' font-size='66'%3ERFQ%3C/text%3E%3Ctext x='50%25' y='80%25' dominant-baseline='middle' text-anchor='middle' fill='%23e8f0fe' font-family='Montserrat%2C Arial%2C sans-serif' font-weight='700' font-size='20' letter-spacing='2'%3ESMARTER%3C/text%3E%3C/svg%3E`;
+</script>
+
+<!-- SUPABASE FIRST TIME SETUP -->
+<section id="supabaseSetup" class="signin hidden" style="z-index:60;">
+  <div class="signin-card">
+    <div class="signin-head">
+      <div class="signin-logo-wrap">
+        <img id="supaSetupLogoImg" class="signin-logo-img" alt="App Logo">
+      </div>
+      <div class="signin-title">Database Setup</div>
+      <div class="signin-sub">CONNECT APP TO SUPABASE CLOUD</div>
+    </div>
+    <div class="signin-body">
+      <label class="label" for="supaUrl">Supabase Project URL</label>
+      <input class="input" type="text" id="supaUrl" placeholder="https://xxxx.supabase.co">
+      <label class="label" for="supaKey" style="margin-top:16px">Anon Public API Key</label>
+      <input class="input" type="password" id="supaKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+      <button class="btn primary" id="connectSupaBtn" style="width:100%;padding:14px;margin-top:24px;">Connect to Database</button>
+      <div class="error" id="supaError"></div>
+    </div>
+  </div>
+</section>
+
+<!-- SIGN IN -->
+<section id="signin" class="signin">
+  <div class="signin-card">
+    <div class="signin-head">
+      <div class="signin-logo-wrap">
+        <img id="signinLogoImg" class="signin-logo-img" alt="App Logo">
+      </div>
+      <div class="signin-title">RFQ Smarter</div>
+      <div class="signin-sub">SECURE WORKSPACE</div>
+    </div>
+    <div class="signin-body">
+      <label class="label" for="signinUser">Email or Full Name</label>
+      <input class="input" type="text" id="signinUser" placeholder="Name or Email">
+      <label class="label" for="signinPass" style="margin-top:16px">Password</label>
+      <input class="input" type="password" id="signinPass" placeholder="Enter your password">
+      <button class="btn primary" id="signinBtn">Sign In</button>
+      <div class="error" id="signinError"></div>
+      <p class="subtle" style="text-align:center;margin:24px 0 0">Authentication secured via Cloud.</p>
+    </div>
+  </div>
+</section>
+
+<!-- MAIN APP -->
+<section id="app" class="app-layout hidden">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <img id="sidebarLogoIcon" class="sidebar-logo-icon" alt="App Logo">
+      <div>
+        <div class="brand-title">RFQ Smarter</div>
+        <div class="brand-sub">Workspace</div>
+      </div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+  </aside>
+
+  <div class="main-wrapper">
+    <header class="topbar">
+      <div class="topbar-logo">
+        <img id="topbarLogoIcon" class="topbar-logo-icon" alt="App Logo">
+        <div class="page-title" id="pageTitle">Dashboard</div>
+      </div>
+      <div class="header-actions">
+        <span class="date" id="todayDate"></span>
+        <span class="pill" id="userBadge"></span>
+        <button class="btn sm" id="signoutBtn">Sign Out</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Dashboard -->
+      <section id="view-dashboard" class="view active">
+        <div class="kpis">
+          <div class="kpi"><div class="kpi-label">Active Tenders</div><div class="kpi-value" id="kpiActive">0</div></div>
+          <div class="kpi"><div class="kpi-label">Total Pipeline</div><div class="kpi-value" id="kpiTotal">0</div></div>
+          <div class="kpi"><div class="kpi-label">RFQs Issued</div><div class="kpi-value" id="kpiRfq">0</div></div>
+          <div class="kpi"><div class="kpi-label" style="color:var(--danger)">Vendors Pending</div><div class="kpi-value" id="kpiPending" style="color:var(--danger)">0</div></div>
+          <div class="kpi"><div class="kpi-label" style="color:var(--primary)">Response Rate</div><div class="kpi-value" id="kpiRate" style="color:var(--primary)">0%</div></div>
+        </div>
+        <div class="dash-grid">
+          <div class="card"><div class="chart-title">Upcoming Deadlines</div><div id="deadlineList"><div class="empty">No upcoming deadlines.</div></div></div>
+          <div class="card"><div class="chart-title">RFQs by Discipline</div><div id="disciplineBars"><div class="empty">No data yet.</div></div></div>
+        </div>
+        <div class="dash-grid">
+          <div class="card"><div class="chart-title">RFQs per Project</div><div id="projectBars"><div class="empty">No data yet.</div></div></div>
+          <div class="card"><div class="chart-title">Recent RFQ Activity</div><div id="activityList"><div class="empty">No RFQ activity yet.</div></div></div>
+        </div>
+      </section>
+
+      <!-- Pipeline -->
+      <section id="view-pipeline" class="view">
+        <div class="toolbar"><h2 class="section-title">Tender Pipeline</h2><button class="btn primary" id="addProjectBtn">+ Add New Project</button></div>
+        <div class="table-wrap"><table><thead><tr><th style="width:25%">Project</th><th style="width:13%">Client</th><th style="width:14%">Assignee</th><th style="width:16%">Location</th><th style="width:10%">Status</th><th style="width:10%">Deadline</th><th style="width:12%">Actions</th></tr></thead><tbody id="pipelineBody"></tbody></table></div>
+      </section>
+
+      <!-- RFQ Generator -->
+      <section id="view-rfq" class="view">
+        <div class="card" style="margin-bottom:24px">
+          <div class="form-row">
+            <div class="field"><label class="label">Target Project</label><select class="select" id="rfqTender"><option value="">Select Project</option></select></div>
+            <div class="field"><label class="label">Quotation Deadline <span style="color:var(--muted);font-weight:400;font-size:11px;text-transform:none;">(Suppliers must reply by)</span></label><input class="input" type="date" id="rfqDeadline"></div>
+          </div>
+        </div>
+        <div class="split">
+          <div class="card stack">
+            <div><label class="label">Scope / Discipline</label><select class="select" id="rfqDiscipline"><option value="">Select Discipline</option></select></div>
+            <div><label class="label">Package 1</label><select class="select" id="rfqPackage1" disabled></select></div>
+            <div><label class="label">Package 2 (Optional)</label><select class="select" id="rfqPackage2" disabled></select></div>
+            <div><label class="label">Suppliers</label><div class="supplier-list" id="supplierList"><div class="empty">Select a discipline and package.</div></div></div>
+          </div>
+          <div class="card stack">
+            <div><label class="label">Attachments</label><input class="input" type="file" id="rfqFiles" multiple><div class="file-list" id="fileList"></div></div>
+            <div class="stack" style="gap:10px"><label class="toggleline"><input type="checkbox" id="ccLead" checked> CC discipline lead: <strong id="leadName">None</strong></label></div>
+            
+            <div class="form-row" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+              <div>
+                <label class="label">RFQ Initial Status</label>
+                <select class="select" id="rfqInitialStatus">
+                  <option value="Pending" selected>Pending / Awaiting Quote</option>
+                  <option value="Urgent Follow-up">Urgent Follow-up Required</option>
+                  <option value="Budgetary Only">Budgetary Price Only</option>
+                </select>
+              </div>
+              <div>
+                <label class="label">Follow-Up Reminder</label>
+                <select class="select" id="reminderDays">
+                  <option value="2">Remind in 2 Days</option>
+                  <option value="5">Remind in 5 Days</option>
+                  <option value="7">Remind in 1 Week</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="toolbar" style="justify-content: space-between; margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
+              <label class="label" style="margin:0; font-size:13px;">Email Actions</label>
+              <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <button class="btn primary" id="exportEmlBtn" disabled>Export Draft (.eml)</button>
+                <button class="btn warn" id="createReminderBtn" disabled>
+                  <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                  Outlook Reminder (.ics)
+                </button>
+              </div>
+            </div>
+
+            <div class="preview" id="rfqPreview">System awaiting configuration.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Registry -->
+      <section id="view-registry" class="view">
+        <div class="toolbar">
+          <input class="input" id="logSearch" placeholder="Search registry…" style="max-width:280px">
+          <select class="select" id="logStatus" style="max-width:170px">
+            <option value="all">All Statuses</option>
+            <option value="pending">Has Pending</option>
+            <option value="submitted">All Submitted</option>
+          </select>
+          <button class="btn accent" id="exportLogsBtn">Export CSV</button>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th style="width:12%">Date</th><th style="width:19%">Project</th><th style="width:12%">Scope</th><th style="width:19%">Packages</th><th style="width:38%">Vendor Tracking</th></tr></thead><tbody id="logBody"></tbody></table></div>
+      </section>
+
+      <!-- Tasks -->
+      <section id="view-tasks" class="view">
+        <div class="toolbar"><button class="btn primary" id="addTaskBtn">+ New Task</button><select class="select" id="taskFilterProject" style="max-width:240px"><option value="all">All Projects</option></select></div>
+        <div class="task-board" id="taskBoard"></div>
+      </section>
+
+      <!-- Quotes -->
+      <section id="view-quotes" class="view">
+        <div class="toolbar">
+          <button class="btn primary" id="addQuoteBtn">+ Add Quotation</button>
+          <select class="select" id="quoteFilterProject" style="max-width:240px"><option value="all">All Projects</option></select>
+          <select class="select" id="quoteFilterScope" style="max-width:180px"><option value="all">All Scopes</option><option>Mechanical</option><option>Electrical</option><option>Civil</option><option>Architecture</option></select>
+          <select class="select" id="quoteFilterPackage" style="max-width:210px"><option value="all">All Packages</option></select>
+          <button class="btn accent" id="exportQuotesBtn">Export CSV</button>
+        </div>
+        <div class="quote-summary" id="quoteSummary"></div>
+        <!-- Side-by-side comparison panel (visible when a specific package is selected + 2+ quotes) -->
+        <div class="cmp-panel hidden" id="cmpPanel"></div>
+        <div class="table-wrap"><table style="min-width:920px;table-layout:auto"><thead><tr><th>Vendor</th><th>Project</th><th>Scope</th><th>Package</th><th>Total Price</th><th>Currency</th><th>Lead Time</th><th>Tech Score</th><th>Rank</th><th>Actions</th></tr></thead><tbody id="quoteBody"></tbody></table></div>
+      </section>
+
+      <!-- Settings -->
+      <section id="view-settings" class="view">
+        <div class="settings-page">
+
+          <!-- ── GROUP: WORKSPACE IDENTITY ── -->
+          <div class="settings-group-header">
+            <div class="settings-group-header-line"></div>
+            <span class="settings-group-header-label">Workspace Identity</span>
+            <div class="settings-group-header-line"></div>
+          </div>
+
+          <!-- Brand Identity -->
+          <div class="settings-section">
+            <div class="settings-section-head">
+              <div class="settings-section-icon">
+                <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+              </div>
+              <div>
+                <div class="settings-section-title">Brand Identity</div>
+                <div class="settings-section-sub">App logo, header icon, and installation manifest graphics.</div>
+              </div>
+            </div>
+            <div class="settings-section-body">
+               <div style="display:flex; align-items:center; gap:24px;">
+                <img id="logoPreview" class="logo-preview" alt="Current App logo" style="width:100px; height:100px; object-fit:contain; border:1px solid var(--border); border-radius:12px; padding:0; background:transparent;">
+                <div>
+                  <div class="toolbar" style="margin-bottom:8px;">
+                    <label class="btn primary" for="logoFile">Upload Logo</label>
+                    <button class="btn" id="resetLogoBtn">Restore Default</button>
+                    <input type="file" accept="image/*" id="logoFile" class="hidden">
+                  </div>
+                  <div class="subtle">Changes are synchronized globally across your Workspace. Re-install App PWA to reflect icon changes on device OS.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- App & Installation -->
+          <div class="settings-section">
+            <div class="settings-section-head">
+              <div class="settings-section-icon">
+                <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+              </div>
+              <div>
+                <div class="settings-section-title">App Installation</div>
+                <div class="settings-section-sub">Deploy as a Desktop or Mobile PWA for optimal integrated experience.</div>
+              </div>
+            </div>
+            <div class="settings-section-body" style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+              <div style="flex:1;min-width:200px">
+                <div style="font-weight:700;color:var(--dark);margin-bottom:6px;font-size:14px;">RFQ Smarter Workspace Environment</div>
+                <div class="subtle">Install this application directly on your device. Provides enhanced performance, OS integration, and standalone window launch.</div>
+              </div>
+              <button class="btn accent" id="installAppBtn" style="white-space:nowrap; padding: 10px 20px;">
+                <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Install App PWA
+              </button>
+            </div>
+          </div>
+
+          <!-- ── GROUP: TEAM & ACCESS ── -->
+          <div class="settings-group-header">
+            <div class="settings-group-header-line"></div>
+            <span class="settings-group-header-label">Team &amp; Access</span>
+            <div class="settings-group-header-line"></div>
+          </div>
+
+          <!-- Team Members -->
+          <div class="settings-section">
+            <div class="settings-section-head">
+              <div class="settings-section-icon">
+                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+              </div>
+              <div>
+                <div class="settings-section-title">Team Members Directory</div>
+                <div class="settings-section-sub">View and manage authenticated workspace users.</div>
+              </div>
+            </div>
+            <div class="settings-section-body">
+              <div id="teamMemberList"></div>
+              <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border)">
+                <div class="chart-title" style="margin-bottom:16px">Add New Team Member</div>
+                <div class="form-row">
+                  <input class="input" id="newMemberName" placeholder="Full name *">
+                  <input class="input" id="newMemberEmail" placeholder="Email address">
+                  <input class="input" id="newMemberRole" placeholder="Role / Position">
+                  <input class="input" type="password" id="newMemberPass" placeholder="Initial password *">
+                </div>
+                <button class="btn primary" id="addMemberBtn" style="margin-top:20px">Add Team Member</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Discipline Leads -->
+          <div class="settings-section">
+            <div class="settings-section-head">
+              <div class="settings-section-icon">
+                <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+              </div>
+              <div>
+                <div class="settings-section-title">Discipline Lead Assignments</div>
+                <div class="settings-section-sub">Assign responsible engineering leads per discipline for automated CC routing.</div>
+              </div>
+            </div>
+            <div class="settings-section-body">
+              <div id="leadList"></div>
+              <button class="btn primary" id="saveLeadsBtn" style="margin-top:20px">Save Lead Assignments</button>
+            </div>
+          </div>
+
+          <!-- ── GROUP: PROCUREMENT DATABASE ── -->
+          <div class="settings-group-header">
+            <div class="settings-group-header-line"></div>
+            <span class="settings-group-header-label">Procurement Database</span>
+            <div class="settings-group-header-line"></div>
+          </div>
+
+          <!-- Custom Suppliers -->
+          <div class="settings-section">
+            <div class="settings-section-head">
+              <div class="settings-section-icon">
+                <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+              </div>
+              <div>
+                <div class="settings-section-title">Custom Suppliers</div>
+                <div class="settings-section-sub">Dynamically augment the vendor database with ad-hoc suppliers.</div>
+              </div>
+            </div>
+            <div class="settings-section-body">
+              <div id="customSupplierList"></div>
+              <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border)">
+                <div class="chart-title" style="margin-bottom:16px">Add New Supplier</div>
+                <div class="form-row">
+                  <input class="input" id="supplierName" placeholder="Supplier name *">
+                  <select class="select" id="supplierDiscipline"><option>Mechanical</option><option>Electrical</option><option>Civil</option><option>Architecture</option></select>
+                  <input class="input" id="supplierPackage" placeholder="Package *">
+                  <input class="input" id="supplierEmails" placeholder="Emails separated by ; ">
+                </div>
+                <button class="btn primary" id="addSupplierBtn" style="margin-top:20px">Add Supplier</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── GROUP: COMMUNICATION TEMPLATES ── -->
+          <div class="settings-group-header">
+            <div class="settings-group-header-line"></div>
+            <span class="settings-group-header-label">Communication Templates</span>
+            <div class="settings-group-header-line"></div>
+          </div>
+
+          <!-- RFQ Email Template -->
+          <div class="settings-section">
+            <div class="settings-section-head">
+              <div class="settings-section-icon">
+                <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+              </div>
+              <div>
+                <div class="settings-section-title">RFQ Email Template</div>
+                <div class="settings-section-sub">Customize the default body of RFQ emails sent to suppliers.</div>
+              </div>
+            </div>
+            <div class="settings-section-body">
+              <label class="label">Email Body Template</label>
+              <p class="subtle" style="margin:0 0 16px">Supported variables: <code style="background:#f1f3f4;padding:2px 6px;border-radius:4px;color:var(--dark)">{{project_name}}</code> <code style="background:#f1f3f4;padding:2px 6px;border-radius:4px;color:var(--dark)">{{location}}</code> <code style="background:#f1f3f4;padding:2px 6px;border-radius:4px;color:var(--dark)">{{client}}</code> <code style="background:#f1f3f4;padding:2px 6px;border-radius:4px;color:var(--dark)">{{pm}}</code> <code style="background:#f1f3f4;padding:2px 6px;border-radius:4px;color:var(--dark)">{{consultant}}</code> <code style="background:#f1f3f4;padding:2px 6px;border-radius:4px;color:var(--dark)">{{status}}</code> <code style="background:#f1f3f4;padding:2px 6px;border-radius:4px;color:var(--dark)">{{attachments}}</code> <code style="background:#f1f3f4;padding:2px 6px;border-radius:4px;color:var(--dark)">{{deadline}}</code></p>
+              <textarea class="textarea" id="rfqBodyTemplate" style="min-height:240px;font-family:'Consolas',monospace;font-size:13px;"></textarea>
+              <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap">
+                <button class="btn primary" id="saveRfqTemplateBtn">Save Template</button>
+                <button class="btn" id="resetRfqTemplateBtn">Reset to Default</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reminder Email Template -->
+          <div class="settings-section">
+            <div class="settings-section-head">
+              <div class="settings-section-icon">
+                <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+              </div>
+              <div>
+                <div class="settings-section-title">Reminder Email Template</div>
+                <div class="settings-section-sub">Edit the default reminder email triggered in the Registry.</div>
+              </div>
+            </div>
+            <div class="settings-section-body">
+              <label class="label">Reminder Email Body Template</label>
+              <p class="subtle" style="margin:0 0 16px">Supported variables: <code style="background:#f1f3f4;padding:2px 6px;border-radius:4px;color:var(--dark)">{{vendor_name}}</code> <code style="background:#f1f3f4;padding:2px 6px;border-radius:4px;color:var(--dark)">{{project_name}}</code> <code style="background:#f1f3f4;padding:2px 6px;border-radius:4px;color:var(--dark)">{{discipline}}</code> <code style="background:#f1f3f4;padding:2px 6px;border-radius:4px;color:var(--dark)">{{packages}}</code> <code style="background:#f1f3f4;padding:2px 6px;border-radius:4px;color:var(--dark)">{{rfq_date}}</code> <code style="background:#f1f3f4;padding:2px 6px;border-radius:4px;color:var(--dark)">{{deadline}}</code></p>
+              <textarea class="textarea" id="reminderBodyTemplate" style="min-height:220px;font-family:'Consolas',monospace;font-size:13px;"></textarea>
+              <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap">
+                <button class="btn primary" id="saveReminderTemplateBtn">Save Template</button>
+                <button class="btn" id="resetReminderTemplateBtn">Reset to Default</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+    </main>
+  </div>
+</section>
+
+<!-- PROJECT MODAL -->
+<div class="modal-overlay" id="projectModal">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title" id="projectModalTitle">Project</span><button class="close" data-close="projectModal">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="field span2"><label class="label">Project Name *</label><input class="input" id="pName"></div>
+        <div><label class="label">Reference</label><input class="input" id="pRef"></div>
+        <div><label class="label">Client</label><input class="input" id="pClient"></div>
+        <div><label class="label">Project Manager</label><input class="input" id="pPm"></div>
+        <div><label class="label">Consultant</label><input class="input" id="pConsultant"></div>
+        <div><label class="label">Assignee</label><select class="select" id="pAssignee"><option value="">Select</option></select></div>
+        <div><label class="label">Location</label><input class="input" id="pLocation"></div>
+        <div><label class="label">Status</label><select class="select" id="pStatus"><option>New</option><option>Under Study</option><option>Submitted</option><option>Won</option><option>Lost</option><option>On Hold</option></select></div>
+        <div><label class="label">Submission Deadline</label><input class="input" id="pDeadline" type="date"></div>
+      </div>
+      <div class="actions"><button class="btn" data-close="projectModal">Cancel</button><button class="btn primary" id="saveProjectBtn">Save Project</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- TASK MODAL -->
+<div class="modal-overlay" id="taskModal">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title">Task</span><button class="close" data-close="taskModal">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="span2"><label class="label">Task Title *</label><input class="input" id="tTitle"></div>
+        <div><label class="label">Project</label><select class="select" id="tProject"><option value="">Optional</option></select></div>
+        <div><label class="label">Assignee</label><select class="select" id="tAssignee"><option value="">Select</option></select></div>
+        <div><label class="label">Priority</label><select class="select" id="tPriority"><option>Medium</option><option>High</option><option>Low</option></select></div>
+        <div><label class="label">Due Date</label><input class="input" id="tDue" type="date"></div>
+        <div><label class="label">Scope</label><select class="select" id="tScope"><option value="">Optional</option><option>Mechanical</option><option>Electrical</option><option>Civil</option><option>Architecture</option></select></div>
+        <div><label class="label">Status</label><select class="select" id="tStatus"><option>To Do</option><option>In Progress</option><option>For Review</option><option>Done</option></select></div>
+        <div class="span2"><label class="label">Description</label><textarea class="textarea" id="tDesc"></textarea></div>
+      </div>
+      <div class="actions"><button class="btn" data-close="taskModal">Cancel</button><button class="btn primary" id="saveTaskBtn">Save Task</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- QUOTE MODAL -->
+<div class="modal-overlay" id="quoteModal">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title">Quotation</span><button class="close" data-close="quoteModal">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div><label class="label">Vendor *</label><input class="input" id="qVendor"></div>
+        <div><label class="label">Quote Ref</label><input class="input" id="qRef"></div>
+        <div><label class="label">Project *</label><select class="select" id="qProject"><option value="">Optional</option></select></div>
+        <div><label class="label">Scope *</label><select class="select" id="qScope"><option value="">Select</option><option>Mechanical</option><option>Electrical</option><option>Civil</option><option>Architecture</option></select></div>
+        <div><label class="label">Package</label><select class="select" id="qPackage"></select></div>
+        <div><label class="label">Currency</label><select class="select" id="qCurrency"><option>EGP</option><option>USD</option><option>EUR</option></select></div>
+        <div><label class="label">Total Price *</label><input class="input" id="qTotal" type="number"></div>
+        <div><label class="label">Lead Time (Weeks)</label><input class="input" id="qLead" type="number"></div>
+        <div><label class="label">Tech Score (1-10)</label><input class="input" id="qTech" type="number" min="1" max="10"></div>
+        <div><label class="label">Origin / Brand</label><input class="input" id="qOrigin"></div>
+        <div class="span2"><label class="label">Notes</label><textarea class="textarea" id="qNotes"></textarea></div>
+      </div>
+      <div class="actions"><button class="btn" data-close="quoteModal">Cancel</button><button class="btn primary" id="saveQuoteBtn">Save Quotation</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- REMINDER MODAL -->
+<div class="modal-overlay" id="reminderModal">
+  <div class="modal" style="width:min(700px,96vw)">
+    <div class="modal-head">
+      <span class="modal-title" id="reminderModalTitle" style="display:flex;align-items:center;gap:8px;">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+        Reminder Email
+      </span>
+      <button class="close" data-close="reminderModal">×</button>
+    </div>
+    <div class="reminder-modal-body">
+      <div class="reminder-tabs">
+        <button class="reminder-tab-btn active" data-tab="preview">Preview Output</button>
+        <button class="reminder-tab-btn" data-tab="edit">Edit Before Sending</button>
+      </div>
+      <div class="reminder-tab-content active" id="rtab-preview">
+        <div class="label" style="margin-bottom:8px">To:</div>
+        <div id="reminderTo" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:12px;font-family:'Consolas',monospace;color:var(--muted);margin-bottom:16px;"></div>
+        <div class="label" style="margin-bottom:8px">Subject:</div>
+        <div id="reminderSubject" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:13px;font-weight:600;color:var(--dark);margin-bottom:16px;"></div>
+        <div class="label" style="margin-bottom:8px">Body Message:</div>
+        <div class="reminder-preview-box" id="reminderBody"></div>
+      </div>
+      <div class="reminder-tab-content" id="rtab-edit">
+        <div class="label">Subject Line:</div>
+        <input class="input" id="reminderSubjectEdit" style="margin-bottom:16px; font-weight: 600;">
+        <div class="label">Email Body:</div>
+        <textarea class="reminder-textarea" id="reminderBodyEdit"></textarea>
+      </div>
+    </div>
+    <div style="padding:16px 24px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--border)">
+      <p class="subtle" style="margin:0;flex:1">Export as .eml to seamlessly open in Outlook and send.</p>
+      <div style="display:flex;gap:12px">
+        <button class="btn" data-close="reminderModal">Cancel</button>
+        <button class="btn warn" id="exportReminderEmlBtn">
+          <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+          Export Draft (.eml)
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// ---------------------------------------------------------
+// CONSTANTS & GLOBALS
+// ---------------------------------------------------------
+const NAV = [
+  ['dashboard','Dashboard','<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>'],
+  ['pipeline','Tender Pipeline','<svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>'],
+  ['rfq','RFQ Generator','<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>'],
+  ['registry','RFQ Registry','<svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>'],
+  ['tasks','Task Manager','<svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>'],
+  ['quotes','Quote Compare','<svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>'],
+  ['settings','Settings','<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>']
+];
+
+const TASK_STATUSES = ['To Do','In Progress','For Review','Done'];
+
+const DEFAULT_RFQ_BODY = `Dear Sir,
+
+Referring to the A/M Project, you are kindly requested to provide us with your complete commercial and technical offer ASAP.
+
+Email attachments:
+{{attachments}}
+
+Project information:
+Project name: {{project_name}}
+Location: {{location}}
+Status: {{status}}
+Client: {{client}}
+Project Manager: {{pm}}
+Consultant: {{consultant}}
+
+Kindly your quote should include the following:
+- Complete quotation with data sheets.
+- Origin of product(s).
+- Compliance sheet including deviations, if any.
+- Clear exclusions.
+- Stock availability.
+
+Technical information to be provided:
+- Brochures, technical datasheets, and computer-based selection.
+
+Delivery Conditions and Time Frame:
+- Payment terms to be agreed on.
+- Delivery conditions to be on site.
+- Quotation should be received before {{deadline}}
+
+Please acknowledge receiving this email and your willingness to quote.
+
+Best Regards,
+Procurement & Tendering Team
+For any clarifications, please contact the undersigned.`;
+
+const DEFAULT_REMINDER_BODY = `Dear {{vendor_name}},
+
+We hope this message finds you well.
+
+We are following up on our Request for Quotation (RFQ) sent to your esteemed company on {{rfq_date}} for the below project and scope:
+
+Project:    {{project_name}}
+Discipline: {{discipline}}
+Packages:   {{packages}}
+
+We have yet to receive your commercial and technical offer, and we would like to kindly remind you that the submission deadline is {{deadline}}.
+
+We value your participation and look forward to receiving your quotation. Please confirm receipt of this email and your willingness to participate.
+
+Should you require any clarification or additional technical documents, do not hesitate to contact us.
+
+Best Regards,
+Procurement & Tendering Team
+For any clarifications, please contact the undersigned.`;
+
+let supabaseClient = null;
+let tenders = [], logs = [], tasks = [], quotes = [], settings = {}, teamMembers = [];
+let vendorDatabase = { Mechanical:{}, Electrical:{}, Civil:{}, Architecture:{} };
+let currentUser = sessionStorage.getItem('rfq_user') || '';
+let editingProject = null, editingTask = null;
+let selectedSuppliers = [], visibleSuppliers = [], selectedFiles = [], rfqEmail = '', rfqSubject = '', deferredInstallPrompt = null;
+let reminderContext = null; 
+
+// ---------------------------------------------------------
+// HELPERS
+// ---------------------------------------------------------
+function by(id){ return document.getElementById(id); }
+function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function packagesFor(d){ const s=new Set(Object.keys(vendorDatabase[d]||{})); (settings.customSuppliers||[]).filter(x=>x.discipline===d).forEach(x=>s.add(x.package)); return Array.from(s).sort(); }
+function leadFor(d){ return (settings.disciplineLeads||{})[d]||'None'; }
+function safe(s){ return s.replace(/[^a-z0-9]/gi,'_'); }
+function toast(msg){ const t=by('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3500); }
+
+function applyLogos(){
+  const src = settings.prefs?.logoSrc || DEFAULT_LOGO_SVG;
+  ['signinLogoImg','supaSetupLogoImg','sidebarLogoIcon','topbarLogoIcon','logoPreview'].forEach(id=>{ 
+      const el = by(id); 
+      if(el) el.src = src; 
+  });
+  const fav = by('appFavicon'), apple = by('appleTouchIcon');
+  if(fav) fav.href = src;
+  if(apple) apple.href = src;
+  ensureAppManifest(src);
+}
+
+function ensureAppManifest(src){
+  const link=by('manifestLink'); if(!link||!window.Blob||!window.URL) return;
+  const manifest={name:'RFQ Smarter Workspace',short_name:'RFQ Smarter',start_url:location.href,display:'standalone',background_color:'#ffffff',theme_color:'#1a73e8',icons:[{src:src,sizes:'512x512',type:'image/png',purpose:'any'}]};
+  link.href=URL.createObjectURL(new Blob([JSON.stringify(manifest)],{type:'application/manifest+json'}));
+}
+
+function rfqBodyTemplate(){ return (settings.prefs&&settings.prefs.rfqBodyTemplate)||DEFAULT_RFQ_BODY; }
+function reminderBodyTemplate(){ return (settings.prefs&&settings.prefs.reminderBodyTemplate)||DEFAULT_REMINDER_BODY; }
+
+// ---------------------------------------------------------
+// SUPABASE INIT
+// ---------------------------------------------------------
+async function init(){
+  registerServiceWorker();
+  bindStaticEvents();
+  renderSigninEvents();
+
+  const supaUrl = localStorage.getItem('supa_url');
+  const supaKey = localStorage.getItem('supa_key');
+
+  if(!supaUrl||!supaKey){
+    by('supabaseSetup').classList.remove('hidden');
+    by('signin').classList.add('hidden');
+    by('app').classList.add('hidden');
+    applyLogos(); 
+  } else {
+    await connectSupabase(supaUrl, supaKey);
+  }
+}
+
+by('connectSupaBtn').onclick = async () => {
+  const url=by('supaUrl').value.trim(), key=by('supaKey').value.trim(), err=by('supaError');
+  if(!url||!key){ err.textContent='Both URL and API Key are required.'; err.style.display='block'; return; }
+  by('connectSupaBtn').textContent='Connecting...';
+  try {
+    await connectSupabase(url,key);
+    localStorage.setItem('supa_url',url); localStorage.setItem('supa_key',key);
+    by('supabaseSetup').classList.add('hidden');
+    toast('Connected to Supabase successfully!');
+  } catch(e) {
+    err.textContent='Connection failed: '+e.message; err.style.display='block';
+    by('connectSupaBtn').textContent='Connect to Database';
+  }
+};
+
+async function connectSupabase(url, key){
+  supabaseClient = supabase.createClient(url,key);
+  const {error} = await supabaseClient.from('app_settings').select('id').limit(1);
+  if(error&&error.code!=='42P01') throw new Error(error.message);
+  await loadDataFromSupabase();
+  applyLogos();
+  by('supabaseSetup').classList.add('hidden');
+  const validUser = teamMembers.find(u=>u.name===currentUser);
+  if(currentUser&&validUser){ launchApp(); }
+  else { by('signin').classList.remove('hidden'); }
+}
+
+async function loadDataFromSupabase(){
+  const {data:dbTeam, error:teamErr} = await supabaseClient.from('team_members').select('*').order('name');
+  if(teamErr&&teamErr.code!=='42P01') console.error('Failed to load team: '+teamErr.message);
+  teamMembers = dbTeam||[];
+
+  const defaultSettings = {
+    disciplineLeads:{Mechanical:'None',Electrical:'None',Civil:'None',Architecture:'None'},
+    customSuppliers:[],
+    prefs:{ logoSrc:DEFAULT_LOGO_SVG, rfqBodyTemplate:DEFAULT_RFQ_BODY, reminderBodyTemplate:DEFAULT_REMINDER_BODY }
+  };
+  let {data:dbSettings, error:settingErr} = await supabaseClient.from('app_settings').select('payload').eq('id',1).single();
+  if(settingErr&&settingErr.code!=='PGRST116') console.error('Error reading settings: '+settingErr.message);
+
+  if(!dbSettings){
+    await supabaseClient.from('app_settings').insert({id:1, payload:defaultSettings});
+    settings = defaultSettings;
+  } else {
+    settings = dbSettings.payload;
+  }
+  settings.prefs = Object.assign({logoSrc:DEFAULT_LOGO_SVG, rfqBodyTemplate:DEFAULT_RFQ_BODY, reminderBodyTemplate:DEFAULT_REMINDER_BODY}, settings.prefs||{});
+
+  tenders = await fetchTable('tenders');
+  tasks   = await fetchTable('tasks');
+  quotes  = await fetchTable('quotes');
+  logs    = await fetchTable('rfq_logs');
+
+  const rawVendors = await fetchTable('vendors');
+  vendorDatabase = {Mechanical:{}, Electrical:{}, Civil:{}, Architecture:{}};
+  rawVendors.forEach(v=>{
+    if(v.discipline&&v.package&&v.vendor_name){
+      if(!vendorDatabase[v.discipline]) vendorDatabase[v.discipline]={};
+      if(!vendorDatabase[v.discipline][v.package]) vendorDatabase[v.discipline][v.package]=[];
+      vendorDatabase[v.discipline][v.package].push({name:v.vendor_name, emails:v.vendor_emails||''});
+    }
+  });
+}
+
+async function fetchTable(name){
+  const {data,error} = await supabaseClient.from(name).select('*');
+  if(error&&error.code!=='42P01') console.error('Error fetching '+name+': '+error.message);
+  return data||[];
+}
+async function saveSettingsToCloud(){ await supabaseClient.from('app_settings').upsert({id:1, payload:settings}); }
+
+// ---------------------------------------------------------
+// AUTH
+// ---------------------------------------------------------
+function renderSigninEvents(){
+  by('signinBtn').onclick = doSignIn;
+  by('signinUser').addEventListener('keydown',e=>{ if(e.key==='Enter') doSignIn(); });
+  by('signinPass').addEventListener('keydown',e=>{ if(e.key==='Enter') doSignIn(); });
+}
+
+async function doSignIn(){
+  const userInput=by('signinUser').value.trim().toLowerCase(), passInput=by('signinPass').value.trim(), err=by('signinError');
+  if(!userInput||!passInput){ err.textContent='Please enter your Name/Email and Password.'; err.style.display='block'; return; }
+  by('signinBtn').textContent='Authenticating...'; err.style.display='none';
+  try {
+    if(teamMembers.length===0){ const {data}=await supabaseClient.from('team_members').select('*'); teamMembers=data||[]; }
+    const rec = teamMembers.find(u=>(u.email&&u.email.toLowerCase()===userInput)||(u.name&&u.name.toLowerCase()===userInput));
+    if(rec&&rec.passcode===passInput){ currentUser=rec.name; sessionStorage.setItem('rfq_user',currentUser); launchApp(); }
+    else { err.textContent='Incorrect Email/Name or Password.'; err.style.display='block'; by('signinPass').value=''; by('signinPass').focus(); }
+  } catch(e){ err.textContent='Login Error: '+e.message; err.style.display='block'; }
+  finally { by('signinBtn').textContent='Sign In'; }
+}
+
+function launchApp(){
+  by('signin').classList.add('hidden'); by('app').classList.remove('hidden');
+  by('userBadge').textContent=currentUser;
+  by('todayDate').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'short',year:'numeric'});
+  applyLogos(); populateAllSelects(); renderNav(); showView('dashboard');
+}
+
+function signOut(){
+  currentUser=''; sessionStorage.removeItem('rfq_user');
+  by('signinPass').value=''; by('signinUser').value='';
+  by('app').classList.add('hidden'); by('signin').classList.remove('hidden');
+}
+
+// ---------------------------------------------------------
+// NAV & BINDINGS
+// ---------------------------------------------------------
+function renderNav(){
+  by('nav').innerHTML = NAV.map(n=>`<button class="tab" data-view="${n[0]}">${n[2]} ${n[1]}</button>`).join('');
+  by('nav').querySelectorAll('.tab').forEach(b=>b.onclick=()=>showView(b.dataset.view));
+}
+
+function showView(v){
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('active',el.dataset.view===v));
+  by('view-'+v).classList.add('active');
+  const vm = NAV.find(n=>n[0]===v);
+  if(vm) by('pageTitle').innerHTML = vm[1];
+  populateAllSelects();
+  if(v==='dashboard') renderDashboard();
+  if(v==='pipeline') renderPipeline();
+  if(v==='rfq') renderRfq();
+  if(v==='registry') renderLogs();
+  if(v==='tasks') renderTasks();
+  if(v==='quotes') renderQuotes();
+  if(v==='settings') renderSettings();
+}
+
+function bindStaticEvents(){
+  document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>by(b.dataset.close).classList.remove('open'));
+  document.querySelectorAll('input[type="date"]').forEach(el=>{ el.onclick=function(){ try{this.showPicker();}catch(e){} }; });
+
+  by('signoutBtn').onclick=signOut;
+  by('addProjectBtn').onclick=()=>openProject();
+  by('saveProjectBtn').onclick=saveProject;
+  by('rfqTender').onchange=generatePreview;
+  by('rfqDeadline').onchange=generatePreview;
+  by('rfqDiscipline').onchange=onDisciplineChange;
+  by('rfqPackage1').onchange=loadSuppliers;
+  by('rfqPackage2').onchange=loadSuppliers;
+  by('rfqFiles').onchange=e=>{ selectedFiles=Array.from(e.target.files||[]); renderFiles(); generatePreview(); };
+  by('ccLead').onchange=generatePreview;
+  by('exportEmlBtn').onclick=exportEml;
+  
+  if (by('createReminderBtn')) {
+    by('createReminderBtn').onclick = generateOutlookReminder;
+  }
+
+  by('logSearch').oninput=renderLogs;
+  by('logStatus').onchange=renderLogs;
+  by('exportLogsBtn').onclick=()=>exportCSV('RFQ_Log.csv',logsToRows());
+  by('addTaskBtn').onclick=()=>openTask();
+  by('saveTaskBtn').onclick=saveTask;
+  by('taskFilterProject').onchange=renderTasks;
+  by('addQuoteBtn').onclick=openQuote;
+  by('qScope').onchange=fillQuotePackages;
+  by('saveQuoteBtn').onclick=saveQuote;
+  by('quoteFilterProject').onchange=()=>{ populateQuotePackageFilter(); renderQuotes(); };
+  by('quoteFilterScope').onchange=()=>{ populateQuotePackageFilter(); renderQuotes(); };
+  by('quoteFilterPackage').onchange=renderQuotes;
+  by('exportQuotesBtn').onclick=()=>exportCSV('RFQ_Quotations.csv',quoteRows());
+  by('addMemberBtn').onclick=addMember;
+  by('saveLeadsBtn').onclick=saveLeads;
+  by('addSupplierBtn').onclick=addSupplier;
+  by('saveRfqTemplateBtn').onclick=saveRfqTemplate;
+  by('resetRfqTemplateBtn').onclick=resetRfqTemplate;
+  by('saveReminderTemplateBtn').onclick=saveReminderTemplate;
+  by('resetReminderTemplateBtn').onclick=resetReminderTemplate;
+  by('installAppBtn').onclick=installApp;
+  by('exportReminderEmlBtn').onclick=exportReminderEml;
+
+  // Logo Events
+  const fileInput = by('logoFile'), resetLogoBtn = by('resetLogoBtn');
+  if(fileInput) fileInput.onchange = e => {
+      const f = e.target.files[0]; if(!f) return;
+      const reader = new FileReader(); 
+      reader.onload = async ev => {
+          settings.prefs.logoSrc = ev.target.result;
+          await saveSettingsToCloud(); 
+          applyLogos(); 
+          toast('Workspace logo updated on cloud.');
+      };
+      reader.readAsDataURL(f); e.target.value = '';
+  };
+  if(resetLogoBtn) resetLogoBtn.onclick = async () => {
+      settings.prefs.logoSrc = DEFAULT_LOGO_SVG;
+      await saveSettingsToCloud(); 
+      applyLogos(); 
+      toast('App logo restored to default.');
+  };
+
+  // Reminder modal tabs
+  document.querySelectorAll('.reminder-tab-btn').forEach(btn=>{
+    btn.onclick=()=>{
+      document.querySelectorAll('.reminder-tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.reminder-tab-content').forEach(c=>c.classList.remove('active'));
+      btn.classList.add('active');
+      by('rtab-'+btn.dataset.tab).classList.add('active');
+      if(btn.dataset.tab==='edit'){
+        by('reminderSubjectEdit').value=by('reminderSubject').textContent;
+        by('reminderBodyEdit').value=by('reminderBody').textContent;
+      }
+    };
+  });
+}
+
+function populateAllSelects(){
+  const memberOpts='<option value="">Select Assignee</option>'+teamMembers.map(u=>'<option>'+esc(u.name)+'</option>').join('');
+  ['pAssignee','tAssignee'].forEach(id=>{ if(by(id)) by(id).innerHTML=memberOpts; });
+  const tenderOpts='<option value="">Select Project</option>'+tenders.map(t=>'<option value="'+t.id+'">'+esc(t.name)+'</option>').join('');
+  by('rfqTender').innerHTML=tenderOpts;
+  ['tProject','qProject'].forEach(id=>by(id).innerHTML='<option value="">Optional</option>'+tenders.map(t=>'<option>'+esc(t.name)+'</option>').join(''));
+  ['taskFilterProject','quoteFilterProject'].forEach(id=>{
+    const cur=by(id).value||'all';
+    by(id).innerHTML='<option value="all">All Projects</option>'+tenders.map(t=>'<option>'+esc(t.name)+'</option>').join('');
+    by(id).value=cur;
+  });
+  by('rfqDiscipline').innerHTML='<option value="">Select Discipline</option>'+Object.keys(vendorDatabase).map(d=>'<option>'+d+'</option>').join('');
+  populateQuotePackageFilter();
+}
+
+// ---------------------------------------------------------
+// DASHBOARD
+// ---------------------------------------------------------
+function renderDashboard(){
+  const active=tenders.filter(t=>['New','Under Study','Submitted'].includes(t.status)).length;
+  let totalV=0, pending=0;
+  logs.forEach(l=>(l.vendors||[]).forEach(v=>{ totalV++; if(v.status==='Pending') pending++; }));
+  by('kpiActive').textContent=active; by('kpiTotal').textContent=tenders.length;
+  by('kpiRfq').textContent=logs.length; by('kpiPending').textContent=pending;
+  by('kpiRate').textContent=(totalV?Math.round((totalV-pending)/totalV*100):0)+'%';
+
+  const today=new Date(); today.setHours(0,0,0,0);
+  const upcoming=tenders.filter(t=>t.deadline&&['New','Under Study','Submitted'].includes(t.status)).sort((a,b)=>new Date(a.deadline)-new Date(b.deadline)).slice(0,6);
+  by('deadlineList').innerHTML=upcoming.length?upcoming.map(t=>{
+    const diff=Math.ceil((new Date(t.deadline)-today)/86400000);
+    const cls=diff<=5?'bad':diff<=14?'warn':'ok'; const label=diff<0?'Overdue':diff===0?'Today':diff+'d';
+    return '<div class="deadline"><div><strong>'+esc(t.name)+'</strong><small>'+esc(t.client||'-')+' · '+esc(t.deadline)+'</small></div><span class="days '+cls+'">'+label+'</span></div>';
+  }).join(''):'<div class="empty">No upcoming deadlines.</div>';
+
+  function countBy(arr,key){ const m={}; arr.forEach(x=>{ m[x[key]||'Unknown']=(m[x[key]||'Unknown']||0)+1; }); return m; }
+  function bars(id,map,isAccent){
+    const vals=Object.values(map); const max=Math.max.apply(null,vals.concat([1]));
+    by(id).innerHTML=Object.keys(map).length?Object.entries(map).sort((a,b)=>b[1]-a[1]).map(([k,v])=>'<div class="bar-row"><span class="bar-label">'+esc(k)+'</span><div class="bar-track"><div class="bar-fill '+(isAccent?'accent':'')+'" style="width:'+Math.round(v/max*100)+'%"></div></div><strong>'+v+'</strong></div>').join(''):'<div class="empty">No data yet.</div>';
+  }
+  bars('disciplineBars',countBy(logs,'discipline'),false);
+  bars('projectBars',countBy(logs,'project'),true);
+  by('activityList').innerHTML=logs.slice().sort((a,b)=>b.rawDate-a.rawDate).slice(0,7).map(l=>'<div class="deadline"><div><strong>'+esc(l.project)+'</strong><small>'+esc(l.discipline)+' · '+esc(l.packages)+' · '+(l.vendors||[]).length+' vendor(s)</small></div><span class="mini">'+esc((l.date||'').split(',')[0])+'</span></div>').join('')||'<div class="empty">No RFQ activity yet.</div>';
+}
+
+// ---------------------------------------------------------
+// PIPELINE
+// ---------------------------------------------------------
+function renderPipeline(){
+  function statusBadge(s){ const cls={New:'status-new','Under Study':'status-under',Submitted:'status-submitted',Won:'status-won',Lost:'status-lost','On Hold':'status-hold'}[s]||'status-new'; return '<span class="badge '+cls+'">'+esc(s||'New')+'</span>'; }
+  by('pipelineBody').innerHTML=tenders.length?tenders.map(t=>'<tr><td class="wrap"><strong style="color:var(--dark)">'+esc(t.name)+'</strong><div class="mini">'+esc(t.ref||'')+'</div></td><td>'+esc(t.client||'-')+'</td><td class="wrap">'+esc(t.assignee||'-')+'</td><td class="wrap">'+esc(t.location||'-')+'</td><td>'+statusBadge(t.status)+'</td><td>'+esc(t.deadline||'-')+'</td><td><button class="btn sm" data-edit-project="'+t.id+'">Edit</button> <button class="btn sm danger" data-del-project="'+t.id+'">Del</button></td></tr>').join(''):'<tr><td colspan="7" class="empty">No projects yet.</td></tr>';
+  by('pipelineBody').querySelectorAll('[data-edit-project]').forEach(b=>b.onclick=()=>openProject(Number(b.dataset.editProject)));
+  by('pipelineBody').querySelectorAll('[data-del-project]').forEach(b=>b.onclick=()=>deleteProject(Number(b.dataset.delProject)));
+}
+
+function openProject(id){
+  editingProject=id||null; const t=tenders.find(x=>x.id===id)||{};
+  by('projectModalTitle').textContent=id?'Edit Project':'Add Project';
+  ['Name','Ref','Client','Pm','Consultant','Location','Deadline'].forEach(k=>by('p'+k).value=t[k.charAt(0).toLowerCase()+k.slice(1)]||'');
+  by('pAssignee').value=t.assignee||''; by('pStatus').value=t.status||'New';
+  by('projectModal').classList.add('open');
+}
+
+async function saveProject(){
+  const name=by('pName').value.trim(); if(!name) return toast('Project name is required.');
+  by('saveProjectBtn').textContent='Saving...';
+  const obj={name, ref:by('pRef').value.trim(), client:by('pClient').value.trim(), pm:by('pPm').value.trim(), consultant:by('pConsultant').value.trim(), assignee:by('pAssignee').value, location:by('pLocation').value.trim(), status:by('pStatus').value, deadline:by('pDeadline').value};
+  if(editingProject){
+    obj.id=editingProject; await supabaseClient.from('tenders').update(obj).eq('id',obj.id);
+    const i=tenders.findIndex(t=>t.id===editingProject); if(i>-1) tenders[i]=Object.assign({},tenders[i],obj);
+  } else {
+    obj.id=Date.now(); await supabaseClient.from('tenders').insert([obj]); tenders.push(obj);
+  }
+  by('saveProjectBtn').textContent='Save Project'; by('projectModal').classList.remove('open');
+  populateAllSelects(); renderPipeline(); renderDashboard(); toast('Project saved to cloud.');
+}
+
+async function deleteProject(id){
+  if(!confirm('Delete this project?')) return;
+  await supabaseClient.from('tenders').delete().eq('id',id); tenders=tenders.filter(t=>t.id!==id);
+  populateAllSelects(); renderPipeline(); renderDashboard(); toast('Project deleted.');
+}
+
+// ---------------------------------------------------------
+// RFQ GENERATOR
+// ---------------------------------------------------------
+function renderRfq(){ renderRfqPackages(); generatePreview(); }
+function onDisciplineChange(){ selectedSuppliers=[]; renderRfqPackages(); loadSuppliers(); }
+function renderRfqPackages(){
+  const d=by('rfqDiscipline').value, p1=by('rfqPackage1'), p2=by('rfqPackage2'), pkgs=d?packagesFor(d):[];
+  p1.disabled=p2.disabled=!d;
+  p1.innerHTML='<option value="">Select Package 1</option>'+pkgs.map(p=>'<option>'+esc(p)+'</option>').join('');
+  p2.innerHTML='<option value="">Select Package 2 (Optional)</option>'+pkgs.map(p=>'<option>'+esc(p)+'</option>').join('');
+  by('leadName').textContent=leadFor(d);
+}
+
+function loadSuppliers(){
+  const d=by('rfqDiscipline').value, p=[by('rfqPackage1').value,by('rfqPackage2').value].filter(Boolean);
+  visibleSuppliers=[]; selectedSuppliers=[];
+  if(!d||!p.length){ by('supplierList').innerHTML='<div class="empty">Select a discipline and package.</div>'; generatePreview(); return; }
+  p.forEach(pkg=>{
+    (vendorDatabase[d][pkg]||[]).forEach(s=>visibleSuppliers.push(Object.assign({package:pkg},s)));
+    (settings.customSuppliers||[]).filter(s=>s.discipline===d&&s.package===pkg).forEach(s=>visibleSuppliers.push(Object.assign({package:pkg},s)));
+  });
+  const seen={}; visibleSuppliers=visibleSuppliers.filter(s=>{ const k=s.name+'|'+s.package; if(seen[k])return false; seen[k]=1; return true; });
+  by('supplierList').innerHTML=visibleSuppliers.map((s,i)=>'<div class="supplier" data-supplier="'+i+'"><span class="pkg-chip">'+esc(s.package)+'</span><strong>'+esc(s.name)+'</strong><small>'+esc(s.emails||'')+'</small></div>').join('')||'<div class="empty">No suppliers for this package.</div>';
+  by('supplierList').querySelectorAll('[data-supplier]').forEach(el=>el.onclick=()=>toggleSupplier(Number(el.dataset.supplier),el));
+  generatePreview();
+}
+
+function toggleSupplier(i,el){
+  const exists=selectedSuppliers.findIndex(s=>s.index===i);
+  if(exists>-1){ selectedSuppliers.splice(exists,1); el.classList.remove('selected'); }
+  else { selectedSuppliers.push(Object.assign({index:i},visibleSuppliers[i])); el.classList.add('selected'); }
+  generatePreview();
+}
+
+function renderFiles(){
+  by('fileList').innerHTML=selectedFiles.map((f,i)=>'<div class="file"><span>'+esc(f.name)+'</span><button class="btn sm danger" data-remove-file="'+i+'">×</button></div>').join('');
+  by('fileList').querySelectorAll('[data-remove-file]').forEach(b=>b.onclick=()=>{ selectedFiles.splice(Number(b.dataset.removeFile),1); renderFiles(); generatePreview(); });
+}
+
+function getQuotationDeadline(tender){
+  const rfqDl = by('rfqDeadline').value;
+  if(rfqDl) return new Date(rfqDl).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  if(!tender||!tender.deadline) return 'TBD';
+  let dt=new Date(tender.deadline); if(isNaN(dt)) return 'TBD';
+  let n=0; while(n<10){ dt.setDate(dt.getDate()-1); if(dt.getDay()!==5&&dt.getDay()!==6) n++; }
+  return dt.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+}
+
+function generatePreview(){
+  const t=tenders.find(x=>String(x.id)===by('rfqTender').value), d=by('rfqDiscipline').value, pkgs=[by('rfqPackage1').value,by('rfqPackage2').value].filter(Boolean);
+  by('leadName').textContent=leadFor(d);
+  
+  if(!t||!d||!pkgs.length||!selectedSuppliers.length){ 
+      by('rfqPreview').textContent='System awaiting configuration. Select project, discipline, package, and at least one supplier.'; 
+      by('exportEmlBtn').disabled=true; 
+      if(by('createReminderBtn')) by('createReminderBtn').disabled=true;
+      return; 
+  }
+
+  let cc=[]; const lead=leadFor(d);
+  if(by('ccLead').checked&&lead&&lead!=='None'){ const u=teamMembers.find(x=>x.name===lead); if(u&&u.email) cc.push(u.email); }
+  cc=Array.from(new Set(cc));
+  const bcc=selectedSuppliers.map(s=>s.emails).join('; ').split(';').map(e=>e.trim()).filter(Boolean).join('; ');
+  const att=selectedFiles.length?selectedFiles.map(f=>'- '+f.name).join('\n'):'- No files attached';
+  const deadline=getQuotationDeadline(t);
+
+  rfqSubject='RFQ - '+t.name+' - '+pkgs.join(' & ');
+
+  const tmpl=rfqBodyTemplate();
+  rfqEmail=tmpl
+    .replace(/\{\{project_name\}\}/g, t.name||'N/A')
+    .replace(/\{\{location\}\}/g, t.location||'N/A')
+    .replace(/\{\{status\}\}/g, t.status==='Won'?'In-hand':'Tender')
+    .replace(/\{\{client\}\}/g, t.client||'N/A')
+    .replace(/\{\{pm\}\}/g, t.pm||'N/A')
+    .replace(/\{\{consultant\}\}/g, t.consultant||'N/A')
+    .replace(/\{\{attachments\}\}/g, att)
+    .replace(/\{\{deadline\}\}/g, deadline);
+
+  by('rfqPreview').textContent='To: (blank; vendors in Bcc)\nCc: '+(cc.join('; ')||'None')+'\nBcc: '+bcc+'\nSubject: '+rfqSubject+'\n\n'+rfqEmail;
+  by('exportEmlBtn').disabled=false;
+  if(by('createReminderBtn')) by('createReminderBtn').disabled=false;
+}
+
+function readBase64(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||''); r.onerror=rej; r.readAsDataURL(file); }); }
+function chunk(s){ let out=''; for(let i=0;i<s.length;i+=76) out+=s.slice(i,i+76)+'\r\n'; return out; }
+
+async function exportEml(){
+  if(!rfqEmail||!selectedSuppliers.length) return toast('Complete the RFQ setup first.');
+  if(!selectedFiles.length&&!confirm('No files attached. Proceed?')) return;
+  by('exportEmlBtn').textContent='Generating...';
+  
+  const d=by('rfqDiscipline').value;
+  const t=tenders.find(x=>String(x.id)===by('rfqTender').value);
+  const pkgs=[by('rfqPackage1').value,by('rfqPackage2').value].filter(Boolean).join(' + ');
+  const chosenStatus = by('rfqInitialStatus') ? by('rfqInitialStatus').value : 'Pending';
+
+  let cc=[]; const lead=leadFor(d);
+  if(by('ccLead').checked&&lead!=='None'){ const u=teamMembers.find(x=>x.name===lead); if(u&&u.email) cc.push(u.email); }
+  cc=Array.from(new Set(cc));
+  const bcc=selectedSuppliers.map(s=>s.emails).join('; ').split(';').map(e=>e.trim()).filter(Boolean).join(', ');
+  const boundary='----RFQSmarter_'+Date.now();
+  let eml='To: \r\nBcc: '+bcc+'\r\n'+(cc.length?'Cc: '+cc.join(', ')+'\r\n':'')+'Subject: '+rfqSubject+'\r\nX-Unsent: 1\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="'+boundary+'"\r\n\r\n';
+  eml+='--'+boundary+'\r\nContent-Type: text/plain; charset="UTF-8"\r\n\r\n'+rfqEmail+'\r\n\r\n';
+  for(const f of selectedFiles){
+    eml+='--'+boundary+'\r\nContent-Type: application/octet-stream; name="'+f.name+'"\r\nContent-Disposition: attachment; filename="'+f.name+'"\r\nContent-Transfer-Encoding: base64\r\n\r\n'+chunk(await readBase64(f))+'\r\n';
+  }
+  eml+='--'+boundary+'--\r\n';
+  download('RFQ_'+rfqSubject.replace(/[^a-z0-9]+/gi,'_')+'.eml',eml,'message/rfc822');
+
+  const deadline=getQuotationDeadline(t);
+  const newLog={
+    id:Date.now(), date:new Date().toLocaleString('en-GB'), rawDate:Date.now(),
+    project:t.name, discipline:d, packages:pkgs,
+    vendors:selectedSuppliers.map(s=>({name:s.name, emails:s.emails, status:chosenStatus})),
+    quotationDeadline: deadline,
+    issuedBy:currentUser
+  };
+
+  try {
+    await supabaseClient.from('rfq_logs').insert([newLog]); 
+    logs.push(newLog);
+    toast('RFQ generated and archived to registry database with status: ' + chosenStatus);
+    by('exportEmlBtn').textContent='Export Draft (.eml)'; 
+    renderDashboard(); renderLogs();
+  } catch(err) {
+    toast('Registry sync error: ' + err.message);
+  }
+}
+
+async function generateOutlookReminder() {
+    const d = by('rfqDiscipline').value;
+    const t = tenders.find(x => String(x.id) === by('rfqTender').value);
+    const pkgs = [by('rfqPackage1').value, by('rfqPackage2').value].filter(Boolean).join(' & ');
+    
+    if (!t || !selectedSuppliers.length) return toast('Configuration data missing for reminder schema.');
+
+    const vendorEmails = selectedSuppliers.map(s => `${s.name} (${s.emails})`).join('; ');
+    const daysOut = parseInt(by('reminderDays').value) || 2;
+    
+    let reminderDate = new Date();
+    reminderDate.setDate(reminderDate.getDate() + daysOut);
+    reminderDate.setHours(9, 0, 0, 0); 
+
+    const endReminderDate = new Date(reminderDate.getTime() + 30 * 60 * 1000); 
+    const formatICSDate = (date) => date.toISOString().replace(/-|:|\.\d\d\d/g, "");
+    
+    const subject = `FOLLOW UP: Pending RFQ Quotation for ${t.name} [${d}]`;
+    const deadlineText = getQuotationDeadline(t);
+    const description = `Automated procurement follow-up task tracking schedule.\\n\\nProject Reference: ${t.name}\\nWork Package: ${pkgs}\\nTarget Suppliers: ${vendorEmails}\\n\\nOriginal Technical Bid Submission Deadline: ${deadlineText}`;
+
+    const icsContent = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//RFQ Smarter//Workspace//EN",
+        "BEGIN:VEVENT",
+        `UID:RFQ-REMIND-${Date.now()}@rfqsmarter.app`,
+        `DTSTAMP:${formatICSDate(new Date())}`,
+        `DTSTART:${formatICSDate(reminderDate)}`,
+        `DTEND:${formatICSDate(endReminderDate)}`,
+        `SUMMARY:${subject}`,
+        `DESCRIPTION:${description}`,
+        "BEGIN:VALARM",
+        "TRIGGER:-PT0M", 
+        "ACTION:DISPLAY",
+        `DESCRIPTION:RFQ Escalation Notice: Follow up with suppliers for ${t.name}`,
+        "END:VALARM",
+        "END:VEVENT",
+        "END:VCALENDAR"
+    ].join("\r\n");
+
+    download(`Reminder_RFQ_${t.name}_FollowUp.ics`.replace(/[^a-z0-9.]+/gi, '_'), icsContent, 'text/calendar');
+    toast(`Outlook tracker reminder (.ics) compiled for execution in ${daysOut} days.`);
+}
+
+// ---------------------------------------------------------
+// REGISTRY
+// ---------------------------------------------------------
+function renderLogs(){
+  const q=by('logSearch').value.toLowerCase(), stat=by('logStatus').value;
+  let rows=logs.filter(l=>{
+    const hay=[l.project,l.discipline,l.packages,(l.vendors||[]).map(v=>v.name).join(' ')].join(' ').toLowerCase();
+    let ok=hay.includes(q);
+    if(stat==='pending') ok=ok&&(l.vendors||[]).some(v=>v.status==='Pending');
+    if(stat==='submitted') ok=ok&&(l.vendors||[]).length&&(l.vendors||[]).every(v=>v.status==='Submitted');
+    return ok;
+  }).sort((a,b)=>b.rawDate-a.rawDate);
+
+  by('logBody').innerHTML=rows.length?rows.map(l=>{
+    const vendorCells=(l.vendors||[]).map((v,i)=>{
+      const selectHtml=`<select class="select" style="max-width:130px;font-size:12px;padding:4px 8px;" data-log="${l.id}" data-vendor="${i}">
+        <option ${v.status==='Pending'?'selected':''}>Pending</option>
+        <option ${v.status==='Urgent Follow-up'?'selected':''}>Urgent Follow-up</option>
+        <option ${v.status==='Budgetary Only'?'selected':''}>Budgetary Only</option>
+        <option ${v.status==='Submitted'?'selected':''}>Submitted</option>
+        <option ${v.status==='Reminder'?'selected':''}>Reminder</option>
+        <option ${v.status==='Declined'?'selected':''}>Declined</option>
+      </select>`;
+      const reminderBtnHtml=`<button class="remind-btn" data-remind-log="${l.id}" data-remind-vendor="${i}" title="Generate reminder email">🔔 Remind</button>`;
+      return `<div class="vendor-row"><div style="flex:1"><strong>${esc(v.name)}</strong><div class="mini">${esc(v.emails||'')}</div></div><div class="vendor-status-wrap">${selectHtml}${reminderBtnHtml}</div></div>`;
+    }).join('');
+    return `<tr><td class="wrap">${esc(l.date)}</td><td class="wrap"><strong style="color:var(--dark)">${esc(l.project)}</strong><div class="mini">Issued by ${esc(l.issuedBy||'-')}</div></td><td>${esc(l.discipline)}</td><td class="wrap">${esc(l.packages)}</td><td class="wrap">${vendorCells}</td></tr>`;
+  }).join(''):'<tr><td colspan="5" class="empty">No RFQ logs match your filters.</td></tr>';
+
+  // Status change handlers
+  by('logBody').querySelectorAll('[data-log]').forEach(sel=>sel.onchange=async ()=>{
+    const l=logs.find(x=>x.id===Number(sel.dataset.log));
+    if(l){
+      l.vendors[Number(sel.dataset.vendor)].status=sel.value;
+      await supabaseClient.from('rfq_logs').update({vendors:l.vendors}).eq('id',l.id);
+      renderLogs(); renderDashboard(); toast('Status updated in cloud.');
+    }
+  });
+
+  // Reminder button handlers
+  by('logBody').querySelectorAll('[data-remind-log]').forEach(btn=>btn.onclick=()=>{
+    const l=logs.find(x=>x.id===Number(btn.dataset.remindLog));
+    const vi=Number(btn.dataset.remindVendor);
+    if(l&&l.vendors[vi]) openReminderModal(l, vi);
+  });
+}
+
+function logsToRows(){ return [['Date','Project','Discipline','Packages','Vendors','Issued By']].concat(logs.map(l=>[l.date,l.project,l.discipline,l.packages,(l.vendors||[]).map(v=>v.name+' ('+v.status+')').join(' | '),l.issuedBy||''])); }
+
+// ---------------------------------------------------------
+// REMINDER MODAL
+// ---------------------------------------------------------
+function openReminderModal(log, vendorIdx){
+  reminderContext = {log, vendorIdx};
+  const vendor = log.vendors[vendorIdx];
+  const deadline = log.quotationDeadline || 'TBD';
+  const subj = 'REMINDER: RFQ - '+log.project+' - '+log.discipline+' - '+log.packages;
+
+  const tmpl = reminderBodyTemplate();
+  const body = tmpl
+    .replace(/\{\{vendor_name\}\}/g, vendor.name||'Sir/Madam')
+    .replace(/\{\{project_name\}\}/g, log.project||'N/A')
+    .replace(/\{\{discipline\}\}/g, log.discipline||'N/A')
+    .replace(/\{\{packages\}\}/g, log.packages||'N/A')
+    .replace(/\{\{rfq_date\}\}/g, log.date||'N/A')
+    .replace(/\{\{deadline\}\}/g, deadline);
+
+  by('reminderTo').textContent = vendor.emails||'(no email on file)';
+  by('reminderSubject').textContent = subj;
+  by('reminderBody').textContent = body;
+  by('reminderSubjectEdit').value = subj;
+  by('reminderBodyEdit').value = body;
+
+  document.querySelectorAll('.reminder-tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.reminder-tab-content').forEach(c=>c.classList.remove('active'));
+  document.querySelector('.reminder-tab-btn[data-tab="preview"]').classList.add('active');
+  by('rtab-preview').classList.add('active');
+
+  by('reminderModalTitle').innerHTML=`<svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg> Reminder — ${vendor.name}`;
+  by('reminderModal').classList.add('open');
+}
+
+function exportReminderEml(){
+  if(!reminderContext) return;
+  const {log, vendorIdx} = reminderContext;
+  const vendor = log.vendors[vendorIdx];
+  const activeTab = document.querySelector('.reminder-tab-btn.active').dataset.tab;
+  const subj = activeTab==='edit'?by('reminderSubjectEdit').value:by('reminderSubject').textContent;
+  const body = activeTab==='edit'?by('reminderBodyEdit').value:by('reminderBody').textContent;
+  const to = vendor.emails||'';
+
+  const boundary='----RFQSmarter_REM_'+Date.now();
+  let eml='To: '+to+'\r\nSubject: '+subj+'\r\nX-Unsent: 1\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="'+boundary+'"\r\n\r\n';
+  eml+='--'+boundary+'\r\nContent-Type: text/plain; charset="UTF-8"\r\n\r\n'+body+'\r\n\r\n';
+  eml+='--'+boundary+'--\r\n';
+
+  const filename='Reminder_'+subj.replace(/[^a-z0-9]+/gi,'_').slice(0,60)+'.eml';
+  download(filename,eml,'message/rfc822');
+  by('reminderModal').classList.remove('open');
+  toast('Reminder draft exported successfully.');
+}
+
+// ---------------------------------------------------------
+// TASKS
+// ---------------------------------------------------------
+function openTask(id){
+  editingTask=id||null; const t=tasks.find(x=>x.id===id)||{};
+  by('tTitle').value=t.title||''; by('tProject').value=t.project||''; by('tAssignee').value=t.assignee||'';
+  by('tPriority').value=t.priority||'Medium'; by('tDue').value=t.due||''; by('tScope').value=t.scope||'';
+  by('tStatus').value=t.status||'To Do'; by('tDesc').value=t.desc||'';
+  by('taskModal').classList.add('open');
+}
+
+async function saveTask(){
+  const title=by('tTitle').value.trim(); if(!title) return toast('Task title is required.');
+  by('saveTaskBtn').textContent='Saving...';
+  const obj={title, project:by('tProject').value, assignee:by('tAssignee').value, priority:by('tPriority').value, due:by('tDue').value, scope:by('tScope').value, status:by('tStatus').value, desc:by('tDesc').value.trim()};
+  if(editingTask){
+    obj.id=editingTask; await supabaseClient.from('tasks').update(obj).eq('id',obj.id);
+    const i=tasks.findIndex(t=>t.id===editingTask); if(i>-1) tasks[i]=Object.assign({},tasks[i],obj);
+  } else {
+    obj.id=Date.now(); obj.createdBy=currentUser; await supabaseClient.from('tasks').insert([obj]); tasks.push(obj);
+  }
+  by('saveTaskBtn').textContent='Save Task'; by('taskModal').classList.remove('open'); renderTasks(); toast('Task saved to cloud.');
+}
+
+function renderTasks(){
+  const pf=by('taskFilterProject').value; const data=pf==='all'?tasks:tasks.filter(t=>t.project===pf);
+  by('taskBoard').innerHTML=TASK_STATUSES.map(s=>{
+    const col=data.filter(t=>t.status===s);
+    return '<div class="task-col"><div class="task-head"><span>'+s+'</span><span>'+col.length+'</span></div>'+(col.map(t=>'<div class="task-card '+(String(t.priority).toLowerCase())+'"><div class="task-title">'+esc(t.title)+'</div><div class="meta">'+esc(t.project||'-')+'<br>'+esc(t.assignee||'-')+' · '+esc(t.due||'No due date')+'</div><div class="toolbar" style="margin:8px 0 0">'+TASK_STATUSES.filter(x=>x!==s).map(x=>'<button class="btn sm" data-move-task="'+t.id+'" data-status="'+x+'">'+x+'</button>').join('')+'<button class="btn sm danger" data-delete-task="'+t.id+'">Del</button></div></div>').join('')||'<div class="empty">No tasks</div>')+'</div>';
+  }).join('');
+  by('taskBoard').querySelectorAll('[data-move-task]').forEach(b=>b.onclick=async ()=>{
+    const t=tasks.find(x=>x.id===Number(b.dataset.moveTask));
+    if(t){ t.status=b.dataset.status; await supabaseClient.from('tasks').update({status:t.status}).eq('id',t.id); renderTasks(); }
+  });
+  by('taskBoard').querySelectorAll('[data-delete-task]').forEach(b=>b.onclick=async ()=>{
+    if(confirm('Delete this task?')){ const id=Number(b.dataset.deleteTask); await supabaseClient.from('tasks').delete().eq('id',id); tasks=tasks.filter(t=>t.id!==id); renderTasks(); }
+  });
+}
+
+// ---------------------------------------------------------
+// QUOTES
+// ---------------------------------------------------------
+function openQuote(){
+  ['qVendor','qRef','qTotal','qLead','qTech','qOrigin','qNotes'].forEach(id=>by(id).value='');
+  by('qProject').value=''; by('qScope').value=''; by('qCurrency').value='EGP';
+  fillQuotePackages(); by('quoteModal').classList.add('open');
+}
+function fillQuotePackages(){
+  const d=by('qScope').value;
+  by('qPackage').innerHTML='<option value="">Select Package</option>'+(d?packagesFor(d).map(p=>'<option>'+esc(p)+'</option>').join(''):'');
+}
+async function saveQuote(){
+  const vendor=by('qVendor').value.trim(), project=by('qProject').value, scope=by('qScope').value, total=parseFloat(by('qTotal').value)||0;
+  if(!vendor||!project||!scope||!total) return toast('Vendor, project, scope, and total price are required.');
+  by('saveQuoteBtn').textContent='Saving...';
+  const obj={id:Date.now(), vendor, project, scope, package:by('qPackage').value, ref:by('qRef').value.trim(), currency:by('qCurrency').value, totalPrice:total, leadTime:parseInt(by('qLead').value)||0, techScore:Math.max(1,Math.min(10,parseInt(by('qTech').value)||5)), origin:by('qOrigin').value.trim(), notes:by('qNotes').value.trim(), addedBy:currentUser};
+  await supabaseClient.from('quotes').insert([obj]); quotes.push(obj);
+  by('saveQuoteBtn').textContent='Save Quotation'; by('quoteModal').classList.remove('open'); renderQuotes(); toast('Quotation saved to cloud.');
+}
+function populateQuotePackageFilter(){
+  const pf=by('quoteFilterProject').value, sf=by('quoteFilterScope').value;
+  const pkgEl=by('quoteFilterPackage'); if(!pkgEl) return;
+  const cur=pkgEl.value||'all';
+  const pkgs=[...new Set(quotes.filter(q=>(pf==='all'||q.project===pf)&&(sf==='all'||q.scope===sf)&&q.package).map(q=>q.package))].sort();
+  pkgEl.innerHTML='<option value="all">All Packages</option>'+pkgs.map(p=>'<option>'+esc(p)+'</option>').join('');
+  if(pkgs.includes(cur)) pkgEl.value=cur; else pkgEl.value='all';
+}
+
+function renderQuotes(){
+  const pf=by('quoteFilterProject').value, sf=by('quoteFilterScope').value;
+  const pkgf=by('quoteFilterPackage')?by('quoteFilterPackage').value:'all';
+  let data=quotes.filter(q=>(pf==='all'||q.project===pf)&&(sf==='all'||q.scope===sf)&&(pkgf==='all'||q.package===pkgf));
+  const prices=data.map(q=>q.totalPrice).filter(Boolean);
+  const min=prices.length?Math.min.apply(null,prices):0, avg=prices.length?Math.round(prices.reduce((a,b)=>a+b,0)/prices.length):0;
+  const best=data.find(q=>q.totalPrice===min), tech=data.slice().sort((a,b)=>(b.techScore||0)-(a.techScore||0))[0];
+  by('quoteSummary').innerHTML=data.length?'<div class="kpi"><div class="kpi-label">Quotations</div><div class="kpi-value">'+data.length+'</div></div><div class="kpi"><div class="kpi-label" style="color:var(--ok)">Lowest Price</div><div class="kpi-value" style="font-size:32px;color:var(--ok)">'+(min?min.toLocaleString():'-')+'</div><div class="mini">'+esc(best?best.vendor:'')+'</div></div><div class="kpi"><div class="kpi-label">Average Price</div><div class="kpi-value" style="font-size:32px">'+(avg?avg.toLocaleString():'-')+'</div></div><div class="kpi"><div class="kpi-label" style="color:var(--primary)">Best Tech</div><div class="kpi-value" style="font-size:32px;color:var(--primary)">'+(tech?tech.techScore+'/10':'-')+'</div><div class="mini">'+esc(tech?tech.vendor:'')+'</div></div>':'';
+  const minP=min||1, maxP=prices.length?Math.max.apply(null,prices):1;
+  const leads=data.map(q=>q.leadTime).filter(Boolean), minL=leads.length?Math.min.apply(null,leads):1, maxL=leads.length?Math.max.apply(null,leads):1;
+  data=data.map(q=>{ const ps=q.totalPrice?((maxP-q.totalPrice)/(maxP-minP||1))*40:0, ts=((q.techScore||5)/10)*40, ls=q.leadTime?((maxL-q.leadTime)/(maxL-minL||1))*20:0; return Object.assign({},q,{score:Math.round(ps+ts+ls)}); }).sort((a,b)=>b.score-a.score);
+  renderComparison(data, pkgf);
+  by('quoteBody').innerHTML=data.length?data.map((q,i)=>'<tr><td class="wrap"><strong style="color:var(--dark)">'+esc(q.vendor)+'</strong><div class="mini">'+esc(q.origin||'')+'</div></td><td class="wrap">'+esc(q.project)+'</td><td>'+esc(q.scope)+'</td><td class="wrap">'+esc(q.package||'-')+'</td><td><strong>'+q.totalPrice.toLocaleString()+' '+esc(q.currency)+'</strong></td><td>'+esc(q.currency)+'</td><td>'+(q.leadTime?q.leadTime+'w':'-')+'</td><td>'+q.techScore+'/10<div class="progress"><span style="width:'+(q.techScore*10)+'%"></span></div></td><td><strong>#'+(i+1)+'</strong><div class="mini">'+q.score+'/100</div></td><td><button class="btn sm danger" data-delete-quote="'+q.id+'">Del</button></td></tr>').join(''):'<tr><td colspan="10" class="empty">No quotations yet.</td></tr>';
+  by('quoteBody').querySelectorAll('[data-delete-quote]').forEach(b=>b.onclick=async ()=>{
+    if(confirm('Delete this quotation?')){ const id=Number(b.dataset.deleteQuote); await supabaseClient.from('quotes').delete().eq('id',id); quotes=quotes.filter(q=>q.id!==id); populateQuotePackageFilter(); renderQuotes(); toast('Quote deleted.'); }
+  });
+}
+
+function renderComparison(data, pkgFilter){
+  const panel=by('cmpPanel'); if(!panel) return;
+  if(pkgFilter==='all'||data.length<2){ panel.classList.add('hidden'); return; }
+
+  const prices=data.map(q=>q.totalPrice).filter(Boolean);
+  const leads=data.map(q=>q.leadTime).filter(Boolean);
+  const minPrice=prices.length?Math.min(...prices):null;
+  const maxPrice=prices.length&&prices.length>1?Math.max(...prices):null;
+  const minLead=leads.length?Math.min(...leads):null;
+  const maxLead=leads.length&&leads.length>1?Math.max(...leads):null;
+  const maxTech=data.length?Math.max(...data.map(q=>q.techScore||0)):null;
+
+  const cards=data.map((q,i)=>{
+    const isLowPrice=q.totalPrice&&q.totalPrice===minPrice;
+    const isHighPrice=q.totalPrice&&q.totalPrice===maxPrice&&minPrice!==maxPrice;
+    const isFastLead=q.leadTime&&q.leadTime===minLead;
+    const isSlowLead=q.leadTime&&q.leadTime===maxLead&&minLead!==maxLead;
+    const isBestTech=q.techScore&&q.techScore===maxTech;
+    const isBest=i===0;
+    const rankCls=isBest?'rank-best':'rank-other';
+    const rankLabel=isBest?'★ Best Overall':'#'+(i+1);
+    return '<div class="cmp-card'+(isBest?' best-overall':'')+'">'
+      +'<div class="cmp-rank '+rankCls+'">'+rankLabel+'</div>'
+      +'<div class="cmp-vendor">'+esc(q.vendor)+'</div>'
+      +'<div class="cmp-origin">'+esc(q.origin||'Origin N/A')+'</div>'
+      +'<div class="cmp-field"><span class="cmp-field-label">Price</span><span class="cmp-field-val'+(isLowPrice?' cmp-best':isHighPrice?' cmp-warn':'')+'">'+q.totalPrice.toLocaleString()+' '+esc(q.currency)+'</span></div>'
+      +'<div class="cmp-field"><span class="cmp-field-label">Lead Time</span><span class="cmp-field-val'+(isFastLead?' cmp-best':isSlowLead?' cmp-warn':'')+'">'+( q.leadTime?q.leadTime+' wks':'—')+'</span></div>'
+      +'<div class="cmp-field"><span class="cmp-field-label">Tech Score</span><span class="cmp-field-val'+(isBestTech?' cmp-best':'')+'">'+q.techScore+'/10</span></div>'
+      +'<div class="cmp-field"><span class="cmp-field-label">Ref</span><span class="cmp-field-val" style="font-size:11px;color:var(--muted)">'+esc(q.ref||'—')+'</span></div>'
+      +(q.notes?'<div class="cmp-notes">'+esc(q.notes.slice(0,80))+(q.notes.length>80?'…':'')+'</div>':'')
+      +'<div class="cmp-score-box"><div class="cmp-score-num">'+q.score+'</div><div class="cmp-score-label">Composite / 100</div></div>'
+      +'</div>';
+  }).join('');
+
+  const scopeLabel=data[0]?(' — '+esc(data[0].scope)):'';
+  panel.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:4px">'
+    +'<div><div class="chart-title" style="margin:0">Side-by-Side Comparison: '+esc(pkgFilter)+scopeLabel+'</div>'
+    +'<div class="subtle" style="margin-top:4px">'+data.length+' vendor'+(data.length>1?'s':'')+' quoted. Ranked by composite score — Price 40% · Tech Score 40% · Lead Time 20%. '
+    +'<span style="color:var(--ok);font-weight:600">Green</span> = best value &nbsp;·&nbsp; <span style="color:var(--warn);font-weight:600">Amber</span> = highest / slowest.</div></div>'
+    +'</div>'
+    +'<div class="cmp-cards">'+cards+'</div>';
+  panel.classList.remove('hidden');
+}
+function quoteRows(){ return [['Vendor','Project','Scope','Package','Total Price','Currency','Lead Time','Tech Score','Origin','Notes']].concat(quotes.map(q=>[q.vendor,q.project,q.scope,q.package,q.totalPrice,q.currency,q.leadTime,q.techScore,q.origin,q.notes])); }
+
+// ---------------------------------------------------------
+// SETTINGS
+// ---------------------------------------------------------
+function renderSettings(){
+  renderTeamList();
+  renderLeads();
+  renderCustomSuppliers();
+  by('rfqBodyTemplate').value = rfqBodyTemplate();
+  by('reminderBodyTemplate').value = reminderBodyTemplate();
+}
+
+function renderTeamList(){
+  by('teamMemberList').innerHTML=teamMembers.length
+    ?teamMembers.map(u=>'<div class="member-row"><div style="flex:1"><strong>'+esc(u.name)+'</strong><div class="mini">'+esc(u.role||'')+(u.email?' · '+esc(u.email):'')+'</div></div><span class="badge status-new">'+esc(u.role||'Member')+'</span></div>').join('')
+    :'<div class="empty">No team members yet.</div>';
+}
+
+function renderLeads(){
+  by('leadList').innerHTML=Object.keys(vendorDatabase).map(d=>'<div class="lead-row"><strong style="flex:1">'+d+'</strong><select class="select" id="lead_'+d+'" style="max-width:200px"><option value="">None</option>'+teamMembers.map(u=>'<option '+(leadFor(d)===u.name?'selected':'')+'>'+esc(u.name)+'</option>').join('')+'</select></div>').join('');
+}
+
+async function saveLeads(){
+  Object.keys(vendorDatabase).forEach(d=>settings.disciplineLeads[d]=by('lead_'+d).value||'None');
+  await saveSettingsToCloud(); by('leadName').textContent=leadFor(by('rfqDiscipline').value); toast('Lead assignments saved to cloud.');
+}
+
+function renderCustomSuppliers(){
+  const cs=settings.customSuppliers||[];
+  by('customSupplierList').innerHTML=cs.length?cs.map((s,i)=>'<div class="vendor-row"><div style="flex:1"><strong>'+esc(s.name)+'</strong><div class="mini">'+esc(s.discipline)+' · '+esc(s.package)+' · '+esc(s.emails)+'</div></div><button class="btn sm danger" data-remove-supplier="'+i+'">Remove</button></div>').join(''):'<div class="empty">No custom suppliers yet.</div>';
+  by('customSupplierList').querySelectorAll('[data-remove-supplier]').forEach(b=>b.onclick=async ()=>{
+    settings.customSuppliers.splice(Number(b.dataset.removeSupplier),1);
+    await saveSettingsToCloud(); renderCustomSuppliers();
+  });
+}
+
+async function addMember(){
+  const name=by('newMemberName').value.trim(), email=by('newMemberEmail').value.trim(), role=by('newMemberRole').value.trim(), passcode=by('newMemberPass').value.trim();
+  if(!name||!passcode) return toast('Name and password are required.');
+  by('addMemberBtn').textContent='Saving...';
+  const newMember={name, email, role, passcode};
+  const {error}=await supabaseClient.from('team_members').insert([newMember]);
+  if(error){ toast('Failed to add member: '+error.message); }
+  else {
+    teamMembers.push(newMember);
+    ['newMemberName','newMemberEmail','newMemberRole','newMemberPass'].forEach(id=>by(id).value='');
+    populateAllSelects(); renderSettings(); toast('Team member added to cloud database.');
+  }
+  by('addMemberBtn').textContent='Add Team Member';
+}
+
+async function addSupplier(){
+  const name=by('supplierName').value.trim(), discipline=by('supplierDiscipline').value, pkg=by('supplierPackage').value.trim(), emails=by('supplierEmails').value.trim();
+  if(!name||!pkg) return toast('Supplier name and package are required.');
+  by('addSupplierBtn').textContent='Saving...';
+  settings.customSuppliers.push({name, discipline, package:pkg, emails});
+  await saveSettingsToCloud();
+  ['supplierName','supplierPackage','supplierEmails'].forEach(id=>by(id).value='');
+  by('addSupplierBtn').textContent='Add Supplier';
+  renderCustomSuppliers(); toast('Supplier added to cloud.');
+}
+
+async function saveRfqTemplate(){
+  const val=by('rfqBodyTemplate').value.trim();
+  if(!val) return toast('Template cannot be empty.');
+  settings.prefs.rfqBodyTemplate=val;
+  await saveSettingsToCloud(); generatePreview(); toast('RFQ email template saved to cloud.');
+}
+function resetRfqTemplate(){
+  by('rfqBodyTemplate').value=DEFAULT_RFQ_BODY;
+  settings.prefs.rfqBodyTemplate=DEFAULT_RFQ_BODY;
+  saveSettingsToCloud(); generatePreview(); toast('RFQ template reset to default.');
+}
+
+async function saveReminderTemplate(){
+  const val=by('reminderBodyTemplate').value.trim();
+  if(!val) return toast('Template cannot be empty.');
+  settings.prefs.reminderBodyTemplate=val;
+  await saveSettingsToCloud(); toast('Reminder email template saved to cloud.');
+}
+function resetReminderTemplate(){
+  by('reminderBodyTemplate').value=DEFAULT_REMINDER_BODY;
+  settings.prefs.reminderBodyTemplate=DEFAULT_REMINDER_BODY;
+  saveSettingsToCloud(); toast('Reminder template reset to default.');
+}
+
+// ---------------------------------------------------------
+// PWA / INSTALL
+// ---------------------------------------------------------
+function registerServiceWorker(){
+  if('serviceWorker' in navigator&&(location.protocol==='http:'||location.protocol==='https:'))
+    navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+}
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferredInstallPrompt=e; });
+async function installApp(){
+  if(deferredInstallPrompt){ deferredInstallPrompt.prompt(); const r=await deferredInstallPrompt.userChoice; if(r.outcome==='accepted') toast('App install started.'); deferredInstallPrompt=null; return; }
+  toast('To install: use your browser menu → "Add to Home Screen" or "Install App".');
+}
+
+// ---------------------------------------------------------
+// UTILS
+// ---------------------------------------------------------
+function download(name,content,type){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([content],{type:type||'text/plain'})); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0); }
+function exportCSV(name,rows){ if(rows.length<=1) return toast('No data to export.'); const csv=rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\n'); download(name,csv,'text/csv'); }
+
+document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+</body>
+</html>
