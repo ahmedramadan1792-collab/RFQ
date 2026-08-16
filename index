@@ -212,6 +212,46 @@ tr:hover td { background: #f8f9fa; }
 .toast { position: fixed; right: 24px; bottom: 24px; background: #323232; color: #fff; box-shadow: 0 3px 5px -1px rgba(0,0,0,.2), 0 6px 10px 0 rgba(0,0,0,.14); border-radius: 8px; padding: 14px 24px; font-weight: 500; font-size: 14px; opacity: 0; transform: translateY(10px); transition: .25s ease-out; z-index: 100; letter-spacing: 0.2px; }
 .toast.show { opacity: 1; transform: translateY(0); }
 .subtle { color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.5; }
+
+/* ---- AI ASSISTANT ---- */
+.ai-fab { position: fixed; right: 28px; bottom: 28px; width: 52px; height: 52px; border-radius: 50%; border: 0; background: linear-gradient(135deg, #1a73e8, #8ab4f8); color: #fff; font-size: 22px; cursor: pointer; box-shadow: 0 4px 16px rgba(26,115,232,.45); z-index: 200; display: flex; align-items: center; justify-content: center; transition: .2s; }
+.ai-fab:hover { transform: scale(1.08); box-shadow: 0 6px 24px rgba(26,115,232,.6); }
+.ai-fab svg { width: 24px; height: 24px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.ai-panel { position: fixed; right: 24px; bottom: 92px; width: 400px; max-height: 78vh; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.18); z-index: 199; display: flex; flex-direction: column; overflow: hidden; transform: translateY(16px); opacity: 0; pointer-events: none; transition: .25s ease-out; }
+.ai-panel.open { transform: translateY(0); opacity: 1; pointer-events: all; }
+.ai-panel-head { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); background: linear-gradient(135deg,#e8f0fe,#f0f4ff); flex-shrink: 0; }
+.ai-panel-title { font-weight: 700; font-size: 14px; color: var(--dark); display: flex; align-items: center; gap: 8px; }
+.ai-panel-title span { background: linear-gradient(135deg,#1a73e8,#8ab4f8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-family: 'Montserrat',sans-serif; font-size: 15px; }
+.ai-close { background: transparent; border: 0; color: var(--muted); font-size: 20px; cursor: pointer; padding: 0; line-height: 1; }
+.ai-tabs { display: flex; gap: 0; padding: 0 16px; border-bottom: 1px solid var(--border); background: #fafbfc; flex-shrink: 0; overflow-x: auto; }
+.ai-tab { border: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; padding: 10px 12px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: .15s; }
+.ai-tab:hover { color: var(--dark); }
+.ai-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.ai-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.ai-tab-panel { display: none; flex-direction: column; gap: 12px; }
+.ai-tab-panel.active { display: flex; }
+.ai-result { background: #f8f9fa; border: 1px solid var(--border); border-radius: 8px; padding: 14px; font-size: 13px; line-height: 1.65; color: var(--dark); white-space: pre-wrap; min-height: 60px; max-height: 260px; overflow-y: auto; }
+.ai-result.loading { color: var(--muted); font-style: italic; animation: ai-pulse 1.5s ease-in-out infinite; }
+@keyframes ai-pulse { 0%,100%{opacity:.5} 50%{opacity:1} }
+.ai-result.error { background: #fce8e6; color: var(--danger); border-color: #fad2cf; }
+.ai-result.success { background: #e6f4ea; border-color: #ceead6; color: #1e4d2b; }
+.ai-chat-messages { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.ai-msg { padding: 10px 12px; border-radius: 8px; font-size: 13px; line-height: 1.6; max-width: 95%; }
+.ai-msg.user { background: #e8f0fe; color: var(--accent-text); align-self: flex-end; border-radius: 8px 8px 2px 8px; }
+.ai-msg.ai { background: #f8f9fa; color: var(--dark); border: 1px solid var(--border); align-self: flex-start; border-radius: 8px 8px 8px 2px; white-space: pre-wrap; }
+.ai-chat-input-row { display: flex; gap: 8px; align-items: flex-end; }
+.ai-chat-input { flex: 1; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 13px; resize: none; min-height: 40px; max-height: 120px; outline: none; transition: .2s; }
+.ai-chat-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,115,232,.12); }
+.ai-send-btn { border: 0; background: var(--primary); color: #fff; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-weight: 600; font-size: 13px; transition: .2s; flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
+.ai-send-btn:hover { background: var(--primary2); }
+.ai-send-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+.ai-action-btn { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 10px 14px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--dark); transition: .2s; width: 100%; text-align: left; }
+.ai-action-btn:hover { background: #e8f0fe; border-color: var(--primary); color: var(--primary); }
+.ai-action-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.ai-badge { display: inline-block; background: linear-gradient(135deg,#1a73e8,#8ab4f8); color: #fff; border-radius: 4px; font-size: 10px; font-weight: 700; padding: 2px 6px; letter-spacing: 0.5px; vertical-align: middle; margin-left: 6px; }
+.ai-inline-btn { border: 1px solid var(--primary); background: #e8f0fe; color: var(--accent-text); border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: .2s; }
+.ai-inline-btn:hover { background: #d2e3fc; }
+.ai-inline-btn svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.2; }
 .empty { color: var(--muted); font-weight: 500; text-align: center; padding: 30px; background: #f8f9fa; border-radius: 8px; border: 1px dashed var(--border); }
 .toggleline { display: flex; gap: 10px; align-items: center; font-weight: 500; color: var(--dark); }
 .progress { height: 6px; background: #f1f3f4; border-radius: 99px; overflow: hidden; margin-top: 8px; }
@@ -399,6 +439,11 @@ const DEFAULT_LOGO_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/200
                   <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
                   Outlook Reminder (.ics)
                 </button>
+                <button class="ai-inline-btn" id="rfqAiEnhanceInline" disabled title="Enhance email body with AI">
+                  <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"></path><path d="M8 12h.01M12 12h.01M16 12h.01" stroke="currentColor" stroke-width="2.5"></path></svg>
+                  AI Enhance
+                  <span class="ai-badge">AI</span>
+                </button>
               </div>
             </div>
 
@@ -435,6 +480,11 @@ const DEFAULT_LOGO_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/200
           <select class="select" id="quoteFilterScope" style="max-width:180px"><option value="all">All Scopes</option><option>Mechanical</option><option>Electrical</option><option>Civil</option><option>Architecture</option></select>
           <select class="select" id="quoteFilterPackage" style="max-width:210px"><option value="all">All Packages</option></select>
           <button class="btn accent" id="exportQuotesBtn">Export CSV</button>
+          <button class="ai-inline-btn" id="quotesAiBtn" title="AI Quote Analysis">
+            <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"></path><path d="M8 12h.01M12 12h.01M16 12h.01" stroke="currentColor" stroke-width="2.5"></path></svg>
+            AI Analyze
+            <span class="ai-badge">AI</span>
+          </button>
         </div>
         <div class="quote-summary" id="quoteSummary"></div>
         <!-- Side-by-side comparison panel (visible when a specific package is selected + 2+ quotes) -->
@@ -706,6 +756,86 @@ const DEFAULT_LOGO_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/200
   </div>
 </div>
 
+<!-- AI ASSISTANT PANEL -->
+<button class="ai-fab hidden" id="aiFab" title="AI Procurement Assistant">
+  <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"></path><path d="M8 12h.01M12 12h.01M16 12h.01" stroke="#fff" stroke-width="2.5"></path></svg>
+</button>
+
+<div class="ai-panel" id="aiPanel">
+  <div class="ai-panel-head">
+    <div class="ai-panel-title">
+      <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:#1a73e8;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"></path><path d="M8 12h.01M12 12h.01M16 12h.01" stroke="#1a73e8" stroke-width="2.5"></path></svg>
+      <span>AI Procurement Assistant</span>
+    </div>
+    <button class="ai-close" id="aiPanelClose">×</button>
+  </div>
+  <div class="ai-tabs">
+    <button class="ai-tab active" data-aitab="chat">Chat</button>
+    <button class="ai-tab" data-aitab="rfq">RFQ Assist</button>
+    <button class="ai-tab" data-aitab="quotes">Quote Analyze</button>
+    <button class="ai-tab" data-aitab="risk">Risk Flags</button>
+  </div>
+  <div class="ai-body">
+    <!-- CHAT TAB -->
+    <div class="ai-tab-panel active" id="aitab-chat">
+      <div class="ai-chat-messages" id="aiChatMessages">
+        <div class="ai-msg ai">Hello! I'm your AI procurement assistant. I can help you analyze RFQ data, draft emails, evaluate vendor quotes, identify risks, and answer questions about your projects. What do you need?</div>
+      </div>
+      <div class="ai-chat-input-row">
+        <textarea class="ai-chat-input" id="aiChatInput" placeholder="Ask anything about your tenders, vendors, or quotes…" rows="2"></textarea>
+        <button class="ai-send-btn" id="aiChatSend">
+          <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:#fff;stroke-width:2.5;stroke-linecap:round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          Send
+        </button>
+      </div>
+    </div>
+    <!-- RFQ ASSIST TAB -->
+    <div class="ai-tab-panel" id="aitab-rfq">
+      <p class="subtle">AI will analyze your current RFQ configuration and generate an enhanced, professional email body tailored to your project context.</p>
+      <button class="ai-action-btn" id="aiEnhanceRfq">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line></svg>
+        Enhance RFQ Email Body
+      </button>
+      <button class="ai-action-btn" id="aiSuggestVendors">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        Suggest Vendor Evaluation Criteria
+      </button>
+      <button class="ai-action-btn" id="aiChecklistRfq">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+        RFQ Completeness Checklist
+      </button>
+      <div class="ai-result" id="aiRfqResult" style="display:none"></div>
+      <button class="btn primary" id="aiApplyRfqBody" style="display:none;width:100%">Apply to RFQ Template</button>
+    </div>
+    <!-- QUOTE ANALYZE TAB -->
+    <div class="ai-tab-panel" id="aitab-quotes">
+      <p class="subtle">Select a package in the Quotes view first, then run AI analysis to get vendor ranking insights and negotiation tips.</p>
+      <button class="ai-action-btn" id="aiAnalyzeQuotes">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+        Analyze Current Quote Comparison
+      </button>
+      <button class="ai-action-btn" id="aiNegotiationTips">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        Get Negotiation Tips for Best Vendor
+      </button>
+      <div class="ai-result" id="aiQuoteResult" style="display:none"></div>
+    </div>
+    <!-- RISK FLAGS TAB -->
+    <div class="ai-tab-panel" id="aitab-risk">
+      <p class="subtle">AI scans your active tenders and RFQ registry to identify commercial risks, overdue items, and procurement health issues.</p>
+      <button class="ai-action-btn" id="aiScanRisks">
+        <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        Scan All Active Risks
+      </button>
+      <button class="ai-action-btn" id="aiProjectHealth">
+        <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        Procurement Health Report
+      </button>
+      <div class="ai-result" id="aiRiskResult" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
 <!-- REMINDER MODAL -->
 <div class="modal-overlay" id="reminderModal">
   <div class="modal" style="width:min(700px,96vw)">
@@ -866,13 +996,19 @@ function reminderBodyTemplate(){ return (settings.prefs&&settings.prefs.reminder
 // ---------------------------------------------------------
 // SUPABASE INIT
 // ---------------------------------------------------------
+// Default project credentials (used when a browser has no saved connection yet).
+// This is a Supabase publishable/anon key; it is safe to expose client-side as
+// long as Row Level Security policies are correctly configured on your tables.
+const DEFAULT_SUPA_URL = 'https://hzcnrtucxuddxasegaps.supabase.co';
+const DEFAULT_SUPA_KEY = 'sb_publishable_6F3YNZVvFwsa7c75lzDSoQ_sFoBwu_B';
+
 async function init(){
   registerServiceWorker();
   bindStaticEvents();
   renderSigninEvents();
 
-  const supaUrl = localStorage.getItem('supa_url');
-  const supaKey = localStorage.getItem('supa_key');
+  const supaUrl = localStorage.getItem('supa_url') || DEFAULT_SUPA_URL;
+  const supaKey = localStorage.getItem('supa_key') || DEFAULT_SUPA_KEY;
 
   if(!supaUrl||!supaKey){
     by('supabaseSetup').classList.remove('hidden');
@@ -1685,6 +1821,380 @@ async function installApp(){
 // ---------------------------------------------------------
 function download(name,content,type){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([content],{type:type||'text/plain'})); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0); }
 function exportCSV(name,rows){ if(rows.length<=1) return toast('No data to export.'); const csv=rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\n'); download(name,csv,'text/csv'); }
+
+
+// ---------------------------------------------------------
+// AI ASSISTANT ENGINE
+// ---------------------------------------------------------
+const ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages';
+const AI_MODEL = 'claude-sonnet-4-6';
+let aiChatHistory = [];
+let lastGeneratedRfqBody = '';
+
+async function callAI(systemPrompt, userMessage, maxTokens) {
+  maxTokens = maxTokens || 1000;
+  const messages = typeof userMessage === 'string'
+    ? [{ role: 'user', content: userMessage }]
+    : userMessage;
+  const res = await fetch(ANTHROPIC_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: AI_MODEL, max_tokens: maxTokens, system: systemPrompt, messages })
+  });
+  if (!res.ok) { const e = await res.json(); throw new Error((e.error && e.error.message) || 'API error ' + res.status); }
+  const data = await res.json();
+  return data.content[0].text;
+}
+
+function showAiResult(elId, text, isError, isSuccess) {
+  const el = by(elId);
+  el.style.display = 'block';
+  el.textContent = text;
+  el.className = 'ai-result' + (isError ? ' error' : isSuccess ? ' success' : '');
+}
+
+function setAiLoading(elId, msg) {
+  const el = by(elId);
+  el.style.display = 'block';
+  el.className = 'ai-result loading';
+  el.textContent = msg || 'AI is thinking…';
+}
+
+// ── Init AI FAB ──
+function initAI() {
+  by('aiFab').classList.remove('hidden');
+  by('aiFab').onclick = () => by('aiPanel').classList.toggle('open');
+  by('aiPanelClose').onclick = () => by('aiPanel').classList.remove('open');
+
+  // Tab switching
+  document.querySelectorAll('.ai-tab').forEach(t => t.onclick = () => {
+    document.querySelectorAll('.ai-tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.ai-tab-panel').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    by('aitab-' + t.dataset.aitab).classList.add('active');
+  });
+
+  // Chat send
+  by('aiChatSend').onclick = sendAiChat;
+  by('aiChatInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAiChat(); } });
+
+  // RFQ tab buttons
+  by('aiEnhanceRfq').onclick = aiEnhanceRfqEmail;
+  by('aiSuggestVendors').onclick = aiSuggestVendorCriteria;
+  by('aiChecklistRfq').onclick = aiRfqChecklist;
+  by('aiApplyRfqBody').onclick = aiApplyRfqBody;
+
+  // Quote tab buttons
+  by('aiAnalyzeQuotes').onclick = aiAnalyzeQuotes;
+  by('aiNegotiationTips').onclick = aiNegotiationTips;
+
+  // Risk tab buttons
+  by('aiScanRisks').onclick = aiScanRisks;
+  by('aiProjectHealth').onclick = aiProjectHealth;
+
+  // Inline buttons in views
+  by('rfqAiEnhanceInline').onclick = () => { openAiPanel('rfq'); aiEnhanceRfqEmail(); };
+  by('quotesAiBtn').onclick = () => { openAiPanel('quotes'); aiAnalyzeQuotes(); };
+}
+
+function openAiPanel(tab) {
+  by('aiPanel').classList.add('open');
+  document.querySelectorAll('.ai-tab').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.ai-tab-panel').forEach(x => x.classList.remove('active'));
+  const t = document.querySelector('.ai-tab[data-aitab="' + tab + '"]');
+  if (t) t.classList.add('active');
+  by('aitab-' + tab).classList.add('active');
+}
+
+// ── Chat ──
+async function sendAiChat() {
+  const input = by('aiChatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  by('aiChatSend').disabled = true;
+
+  appendChatMsg('user', text);
+
+  // Build context snapshot for the AI
+  const context = buildProjectContext();
+  aiChatHistory.push({ role: 'user', content: text });
+
+  const systemPrompt = `You are an expert procurement and tendering assistant for a construction company. You have access to the following live data from the RFQ Workspace:
+
+${context}
+
+Answer questions concisely and professionally. Use bullet points for lists. Be specific and actionable. For FIDIC or contractual questions, reference relevant clauses. Keep answers under 250 words unless detail is specifically requested.`;
+
+  try {
+    appendChatMsg('ai', '…');
+    const reply = await callAI(systemPrompt, aiChatHistory.slice(-10));
+    aiChatHistory.push({ role: 'assistant', content: reply });
+    // Remove the "…" placeholder and add real reply
+    const msgs = by('aiChatMessages').querySelectorAll('.ai-msg.ai');
+    msgs[msgs.length - 1].textContent = reply;
+  } catch (e) {
+    const msgs = by('aiChatMessages').querySelectorAll('.ai-msg.ai');
+    msgs[msgs.length - 1].textContent = 'Error: ' + e.message;
+    msgs[msgs.length - 1].style.color = 'var(--danger)';
+  }
+  by('aiChatSend').disabled = false;
+  by('aiChatMessages').scrollTop = 99999;
+}
+
+function appendChatMsg(role, text) {
+  const div = document.createElement('div');
+  div.className = 'ai-msg ' + role;
+  div.textContent = text;
+  by('aiChatMessages').appendChild(div);
+  by('aiChatMessages').scrollTop = 99999;
+}
+
+// ── Context builder ──
+function buildProjectContext() {
+  const activeT = tenders.filter(t => ['New','Under Study','Submitted'].includes(t.status));
+  const pendingV = logs.reduce((n,l) => n + (l.vendors||[]).filter(v=>v.status==='Pending').length, 0);
+  const urgentV = logs.reduce((n,l) => n + (l.vendors||[]).filter(v=>v.status==='Urgent Follow-up').length, 0);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const overdueT = tenders.filter(t => t.deadline && ['New','Under Study','Submitted'].includes(t.status) && new Date(t.deadline) < today);
+  const rfqTenderId = by('rfqTender') ? by('rfqTender').value : '';
+  const currentTender = tenders.find(x => String(x.id) === rfqTenderId);
+  const currentDiscipline = by('rfqDiscipline') ? by('rfqDiscipline').value : '';
+  const pkgs = by('rfqPackage1') ? [by('rfqPackage1').value, by('rfqPackage2').value].filter(Boolean) : [];
+  return `WORKSPACE SUMMARY:
+- Total tenders: ${tenders.length} (${activeT.length} active)
+- RFQ logs issued: ${logs.length}
+- Pending vendor responses: ${pendingV}
+- Urgent follow-ups: ${urgentV}
+- Overdue tenders: ${overdueT.map(t=>t.name).join(', ') || 'None'}
+- Total quotes logged: ${quotes.length}
+- Team members: ${teamMembers.map(u=>u.name+' ('+u.role+')').join(', ')}
+
+ACTIVE TENDERS:
+${activeT.map(t=>`- ${t.name} | Client: ${t.client||'N/A'} | Deadline: ${t.deadline||'N/A'} | Status: ${t.status}`).join('\n') || 'None'}
+
+CURRENT RFQ CONFIGURATION:
+- Project: ${currentTender ? currentTender.name + ' (Client: ' + (currentTender.client||'N/A') + ', Location: ' + (currentTender.location||'N/A') + ')' : 'Not selected'}
+- Discipline: ${currentDiscipline || 'Not selected'}
+- Packages: ${pkgs.join(', ') || 'Not selected'}
+- Selected vendors: ${selectedSuppliers.map(s=>s.name).join(', ') || 'None'}
+
+RECENT RFQ LOGS (last 5):
+${logs.slice().sort((a,b)=>b.rawDate-a.rawDate).slice(0,5).map(l=>`- ${l.project} | ${l.discipline} | ${l.packages} | ${(l.vendors||[]).length} vendors | ${(l.vendors||[]).filter(v=>v.status==='Pending').length} pending`).join('\n') || 'None'}`;
+}
+
+// ── RFQ Tab ──
+async function aiEnhanceRfqEmail() {
+  const t = tenders.find(x => String(x.id) === by('rfqTender').value);
+  const d = by('rfqDiscipline').value;
+  const pkgs = [by('rfqPackage1').value, by('rfqPackage2').value].filter(Boolean);
+  if (!t || !d || !pkgs.length) { showAiResult('aiRfqResult', 'Please select a project, discipline, and at least one package in the RFQ Generator first.', true); by('aiApplyRfqBody').style.display='none'; return; }
+  setAiLoading('aiRfqResult', 'Generating enhanced RFQ email…');
+  by('aiApplyRfqBody').style.display = 'none';
+  const deadline = getQuotationDeadline(t);
+  const vendors = selectedSuppliers.map(s => s.name).join(', ') || 'selected vendors';
+  const systemPrompt = `You are a senior tendering engineer writing professional procurement RFQ emails for construction projects in Egypt. Write in formal English. Be specific, clear, and professional. Your output should be ONLY the email body text — no subject line, no metadata, no markdown formatting.`;
+  const userMsg = `Write a professional RFQ email body for the following:
+Project: ${t.name}
+Client: ${t.client || 'N/A'}
+Location: ${t.location || 'Egypt'}
+Consultant: ${t.consultant || 'N/A'}
+Project Status: ${t.status === 'Won' ? 'In-hand (confirmed project)' : 'Tender stage'}
+Discipline: ${d}
+Packages: ${pkgs.join(' and ')}
+Target vendors: ${vendors}
+Submission deadline: ${deadline}
+Project Manager: ${t.pm || 'N/A'}
+
+Requirements to request in the RFQ:
+1. Complete commercial and technical quotation
+2. Product datasheets and compliance sheets
+3. Country of origin
+4. Clear exclusions
+5. Delivery conditions (DDP site)
+6. Payment terms proposal
+7. Stock availability confirmation
+
+Keep it formal, concise, and suitable for Egyptian construction procurement standards.`;
+  try {
+    const reply = await callAI(systemPrompt, userMsg, 1000);
+    lastGeneratedRfqBody = reply;
+    showAiResult('aiRfqResult', reply, false, false);
+    by('aiApplyRfqBody').style.display = 'block';
+  } catch (e) { showAiResult('aiRfqResult', 'Error: ' + e.message, true); }
+}
+
+function aiApplyRfqBody() {
+  if (!lastGeneratedRfqBody) return;
+  settings.prefs.rfqBodyTemplate = lastGeneratedRfqBody;
+  saveSettingsToCloud();
+  if (by('rfqBodyTemplate')) by('rfqBodyTemplate').value = lastGeneratedRfqBody;
+  generatePreview();
+  toast('AI-enhanced email body applied to RFQ template.');
+  by('aiPanel').classList.remove('open');
+}
+
+async function aiSuggestVendorCriteria() {
+  const d = by('rfqDiscipline').value;
+  const pkgs = [by('rfqPackage1').value, by('rfqPackage2').value].filter(Boolean);
+  if (!d) { showAiResult('aiRfqResult', 'Please select a discipline first.', true); return; }
+  setAiLoading('aiRfqResult', 'Generating vendor evaluation criteria…');
+  by('aiApplyRfqBody').style.display = 'none';
+  const systemPrompt = `You are a procurement specialist for MEP construction projects in Egypt. Provide concise, practical advice.`;
+  const userMsg = `Suggest a vendor technical evaluation scorecard criteria for ${d} discipline${pkgs.length ? ', packages: ' + pkgs.join(', ') : ''}. List 6-8 criteria with weightings that total 100%. Include factors like technical compliance, price, delivery, origin, and track record. Format as a clear list.`;
+  try {
+    const reply = await callAI(systemPrompt, userMsg);
+    showAiResult('aiRfqResult', reply);
+  } catch (e) { showAiResult('aiRfqResult', 'Error: ' + e.message, true); }
+}
+
+async function aiRfqChecklist() {
+  const t = tenders.find(x => String(x.id) === by('rfqTender').value);
+  const d = by('rfqDiscipline').value;
+  const pkgs = [by('rfqPackage1').value, by('rfqPackage2').value].filter(Boolean);
+  const hasVendors = selectedSuppliers.length > 0;
+  const hasFiles = selectedFiles.length > 0;
+  setAiLoading('aiRfqResult', 'Checking RFQ completeness…');
+  by('aiApplyRfqBody').style.display = 'none';
+  const systemPrompt = `You are a quality-control expert for construction procurement. Be direct and actionable.`;
+  const userMsg = `Check this RFQ configuration for completeness and quality:
+- Project selected: ${t ? 'Yes (' + t.name + ')' : 'NO - MISSING'}
+- Client filled: ${t && t.client ? 'Yes' : 'No'}
+- Consultant filled: ${t && t.consultant ? 'Yes' : 'No'}
+- Project Manager filled: ${t && t.pm ? 'Yes' : 'No'}
+- Discipline selected: ${d || 'NO - MISSING'}
+- Packages selected: ${pkgs.length ? pkgs.join(', ') : 'NO - MISSING'}
+- Vendors selected: ${hasVendors ? selectedSuppliers.length + ' vendors' : 'NO - MISSING'}
+- Attachments added: ${hasFiles ? selectedFiles.map(f=>f.name).join(', ') : 'None'}
+- Deadline set: ${by('rfqDeadline').value || 'Not manually set (will auto-calculate)'}
+
+Give a ✅ / ⚠️ / ❌ checklist status for each item, then a 2-line overall recommendation.`;
+  try {
+    const reply = await callAI(systemPrompt, userMsg);
+    showAiResult('aiRfqResult', reply);
+  } catch (e) { showAiResult('aiRfqResult', 'Error: ' + e.message, true); }
+}
+
+// ── Quotes Tab ──
+async function aiAnalyzeQuotes() {
+  if (!quotes.length) { showAiResult('aiQuoteResult', 'No quotes have been logged yet. Add quotations in the Quote Compare view first.', true); return; }
+  setAiLoading('aiQuoteResult', 'Analyzing vendor quotes…');
+  const filterPkg = by('quoteFilterPackage') ? by('quoteFilterPackage').value : 'all';
+  const filterProj = by('quoteFilterProject') ? by('quoteFilterProject').value : 'all';
+  let relevant = quotes;
+  if (filterPkg && filterPkg !== 'all') relevant = relevant.filter(q => q.package === filterPkg);
+  if (filterProj && filterProj !== 'all') relevant = relevant.filter(q => q.project === filterProj);
+  if (!relevant.length) relevant = quotes.slice(-10);
+  const systemPrompt = `You are a senior cost engineer and procurement analyst for construction projects in Egypt. Analyze vendor quotations and provide actionable commercial insights.`;
+  const userMsg = `Analyze these vendor quotations and provide:
+1. Ranking with justification (price + tech score + lead time)
+2. Best value recommendation with reasoning
+3. Red flags or concerns for any vendor
+4. Suggested negotiation points for the top 2 vendors
+
+Quotation data:
+${relevant.map(q => `Vendor: ${q.vendor} | Project: ${q.project} | Package: ${q.package} | Price: ${q.totalPrice} ${q.currency} | Lead Time: ${q.leadTime} weeks | Tech Score: ${q.techScore}/10 | Origin: ${q.origin || 'N/A'} | Notes: ${q.notes || 'None'}`).join('\n')}
+
+Keep analysis concise and practical.`;
+  try {
+    const reply = await callAI(systemPrompt, userMsg);
+    showAiResult('aiQuoteResult', reply);
+  } catch (e) { showAiResult('aiQuoteResult', 'Error: ' + e.message, true); }
+}
+
+async function aiNegotiationTips() {
+  if (!quotes.length) { showAiResult('aiQuoteResult', 'No quotes logged yet.', true); return; }
+  setAiLoading('aiQuoteResult', 'Generating negotiation strategy…');
+  const sorted = quotes.slice().sort((a,b) => {
+    const pA = parseFloat(a.totalPrice)||0, pB = parseFloat(b.totalPrice)||0;
+    const tA = parseFloat(a.techScore)||5, tB = parseFloat(b.techScore)||5;
+    const lA = parseFloat(a.leadTime)||8, lB = parseFloat(b.leadTime)||8;
+    const maxP = Math.max(pA,pB)||1;
+    const sA = (1-pA/maxP)*40 + tA*4 + (1-lA/Math.max(lA,lB,1))*20;
+    const sB = (1-pB/maxP)*40 + tB*4 + (1-lB/Math.max(lA,lB,1))*20;
+    return sB - sA;
+  });
+  const best = sorted[0];
+  const systemPrompt = `You are an expert procurement negotiator for construction projects in Egypt. Give direct, specific negotiation tactics.`;
+  const userMsg = `Generate a negotiation strategy for this vendor:
+Vendor: ${best.vendor}
+Package: ${best.package}
+Total Price: ${best.totalPrice} ${best.currency}
+Lead Time: ${best.leadTime} weeks
+Tech Score: ${best.techScore}/10
+Origin: ${best.origin || 'N/A'}
+Notes: ${best.notes || 'None'}
+
+Competing quotes: ${sorted.slice(1,3).map(q=>`${q.vendor}: ${q.totalPrice} ${q.currency}, ${q.leadTime}wks, score ${q.techScore}`).join(' | ') || 'None'}
+
+Provide: opening position, leverage points, concessions to offer, red lines, and a 3-step negotiation sequence. Be specific and actionable.`;
+  try {
+    const reply = await callAI(systemPrompt, userMsg);
+    showAiResult('aiQuoteResult', reply);
+  } catch (e) { showAiResult('aiQuoteResult', 'Error: ' + e.message, true); }
+}
+
+// ── Risk Tab ──
+async function aiScanRisks() {
+  setAiLoading('aiRiskResult', 'Scanning procurement risks…');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const overdueT = tenders.filter(t => t.deadline && ['New','Under Study','Submitted'].includes(t.status) && new Date(t.deadline) < today);
+  const soonT = tenders.filter(t => { if (!t.deadline || !['New','Under Study','Submitted'].includes(t.status)) return false; const d = Math.ceil((new Date(t.deadline)-today)/86400000); return d>=0&&d<=7; });
+  const pendingLogs = logs.filter(l => (l.vendors||[]).some(v=>v.status==='Pending'));
+  const urgentLogs = logs.filter(l => (l.vendors||[]).some(v=>v.status==='Urgent Follow-up'));
+  const noQuotePkgs = logs.filter(l => { const key = l.project+'|'+l.packages; return !quotes.some(q=>q.project===l.project&&q.package===l.packages); });
+  const systemPrompt = `You are a risk management expert for construction procurement in Egypt. Identify and prioritize commercial and procurement risks clearly using ❌ HIGH / ⚠️ MEDIUM / ✅ LOW risk ratings.`;
+  const userMsg = `Scan these procurement data points for risks:
+
+OVERDUE TENDERS (${overdueT.length}): ${overdueT.map(t=>t.name+' (deadline: '+t.deadline+')').join(', ') || 'None'}
+TENDERS DUE IN 7 DAYS (${soonT.length}): ${soonT.map(t=>{const d=Math.ceil((new Date(t.deadline)-today)/86400000);return t.name+'('+d+'d left)';}).join(', ') || 'None'}
+RFQ LOGS WITH PENDING VENDORS (${pendingLogs.length}): ${pendingLogs.slice(0,5).map(l=>l.project+'/'+l.discipline+': '+(l.vendors||[]).filter(v=>v.status==='Pending').length+' pending').join(', ') || 'None'}
+URGENT FOLLOW-UPS NEEDED (${urgentLogs.length}): ${urgentLogs.slice(0,5).map(l=>l.project+'/'+l.discipline).join(', ') || 'None'}
+RFQ PACKAGES WITH NO QUOTES LOGGED (${noQuotePkgs.length}): ${noQuotePkgs.slice(0,5).map(l=>l.project+'/'+l.packages).join(', ') || 'None'}
+TOTAL ACTIVE TENDERS: ${tenders.filter(t=>['New','Under Study','Submitted'].includes(t.status)).length}
+TOTAL PENDING VENDOR RESPONSES: ${logs.reduce((n,l)=>n+(l.vendors||[]).filter(v=>v.status==='Pending').length,0)}
+
+Identify top 5 procurement risks, rate each, and give a one-line action for each.`;
+  try {
+    const reply = await callAI(systemPrompt, userMsg);
+    showAiResult('aiRiskResult', reply);
+  } catch (e) { showAiResult('aiRiskResult', 'Error: ' + e.message, true); }
+}
+
+async function aiProjectHealth() {
+  setAiLoading('aiRiskResult', 'Generating health report…');
+  const ctx = buildProjectContext();
+  const systemPrompt = `You are a procurement director reviewing a workspace health report. Be concise, use emoji ratings, and be constructive.`;
+  const userMsg = `Based on this procurement workspace data, generate a brief health report with:
+1. Overall health score (0-100) with emoji
+2. 3 strengths
+3. 3 improvement areas
+4. Top 1 priority action this week
+
+${ctx}
+
+Keep the full report under 200 words.`;
+  try {
+    const reply = await callAI(systemPrompt, userMsg);
+    showAiResult('aiRiskResult', reply, false, true);
+  } catch (e) { showAiResult('aiRiskResult', 'Error: ' + e.message, true); }
+}
+
+// ── Hook AI init into launchApp by patching it ──
+// Save ref to original and redefine inside IIFE scope
+const _origLaunchApp = launchApp;
+launchApp = function() {
+  _origLaunchApp();
+  setTimeout(initAI, 150);
+};
+
+// Enable inline rfq ai button when preview is ready
+const _origGeneratePreview = generatePreview;
+generatePreview = function() {
+  _origGeneratePreview();
+  const btn = by('rfqAiEnhanceInline');
+  if (btn) btn.disabled = !(by('exportEmlBtn') && !by('exportEmlBtn').disabled);
+};
 
 document.addEventListener('DOMContentLoaded',init);
 })();
