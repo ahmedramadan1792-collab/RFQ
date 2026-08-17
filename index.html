@@ -95,6 +95,10 @@ main { flex: 1; overflow-y: auto; padding: 32px; background: var(--surface); }
 .topbar-logo-icon { width: 24px; height: 24px; border-radius: 4px; object-fit: contain; }
 .page-title { font-family: 'Montserrat', sans-serif; font-size: 18px; font-weight: 700; color: var(--dark); letter-spacing: -0.3px; display: flex; align-items: center; gap: 10px; }
 .header-actions { display: flex; align-items: center; gap: 16px; }
+.search-wrap { position: relative; }
+.search-input { width: 220px; height: 36px; border-radius: 18px; border: 1px solid var(--border); padding: 0 16px; font-size: 13px; background: #f8f9fa; }
+.search-input:focus { background: #fff; }
+.search-panel { position: absolute; top: 46px; left: 0; width: 320px; max-height: 400px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.16); z-index: 100; }
 .notif-wrap { position: relative; }
 .notif-btn { position: relative; border: 1px solid var(--border); background: #fff; color: var(--muted); border-radius: 50%; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; }
 .notif-btn:hover { background: #f1f3f4; color: var(--dark); }
@@ -165,14 +169,37 @@ tr:hover td { background: #f8f9fa; }
 .file-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .file { display: flex; justify-content: space-between; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 12px; font-weight: 500; align-items: center; }
 .task-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
-.task-col { background: #f8f9fa; border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.task-col { background: #f8f9fa; border: 1px solid var(--border); border-radius: 12px; padding: 16px; transition: 0.15s; }
+.task-col.drag-over { background: #e8f0fe; border-color: var(--primary); }
 .task-head { display: flex; justify-content: space-between; border-bottom: 2px solid var(--border); padding-bottom: 12px; margin-bottom: 16px; font-weight: 700; color: var(--dark); font-size: 12px; letter-spacing: 0.3px; }
-.task-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 12px; box-shadow: var(--shadow-subtle); transition: 0.2s; cursor: pointer; }
+.task-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 12px; box-shadow: var(--shadow-subtle); transition: 0.2s; cursor: grab; }
 .task-card:hover { box-shadow: 0 4px 6px rgba(0,0,0,0.06); transform: translateY(-1px); }
+.task-card.dragging { opacity: 0.4; cursor: grabbing; }
 .task-title { font-weight: 600; margin-bottom: 6px; font-size: 13px; color: var(--dark); line-height: 1.4; }
 .meta { font-size: 11px; color: var(--muted); font-weight: 400; line-height: 1.5; }
 .quote-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
 .mini { font-size: 11px; color: var(--muted); font-weight: 400; margin-top: 4px; }
+.activity-feed { display: flex; flex-direction: column; gap: 2px; }
+.activity-item { display: flex; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--border); font-size: 13px; align-items: flex-start; }
+.activity-item:last-child { border-bottom: none; }
+.activity-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary, #1a73e8); margin-top: 6px; flex-shrink: 0; }
+.activity-body { flex: 1; min-width: 0; }
+.activity-text { color: var(--dark); line-height: 1.5; }
+.activity-text b { font-weight: 700; }
+.activity-time { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.comments-wrap { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 16px; }
+.comments-list { display: flex; flex-direction: column; gap: 10px; max-height: 220px; overflow-y: auto; margin-bottom: 12px; }
+.comment-item { background: #f8f9fa; border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+.comment-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.comment-author { font-weight: 700; color: var(--dark); font-size: 12px; }
+.comment-time { font-size: 11px; color: var(--muted); }
+.comment-msg { color: var(--dark); line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.comment-input-row { display: flex; gap: 8px; }
+.comment-input-row textarea { flex: 1; min-height: 44px; resize: vertical; }
+.search-result-item { padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; }
+.search-result-item:hover { background: #f8f9fa; }
+.search-result-type { font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); font-weight: 700; }
+.search-result-title { color: var(--dark); font-weight: 600; margin-top: 2px; }
 
 /* Modals */
 .modal-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(32,33,36,0.6); backdrop-filter: blur(2px); z-index: 60; padding: 16px; }
@@ -376,6 +403,10 @@ const DEFAULT_LOGO_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAicAAACS
         <div class="page-title" id="pageTitle">Dashboard</div>
       </div>
       <div class="header-actions">
+        <div class="search-wrap" id="searchWrap">
+          <input class="search-input" id="globalSearchInput" placeholder="Search projects, tasks, quotes...">
+          <div class="search-panel hidden" id="searchPanel"></div>
+        </div>
         <span class="date" id="todayDate"></span>
         <div class="notif-wrap" id="notifWrap">
           <button class="notif-btn" id="notifBtn" title="Notifications">
@@ -414,7 +445,7 @@ const DEFAULT_LOGO_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAicAAACS
 
       <!-- Pipeline -->
       <section id="view-pipeline" class="view">
-        <div class="toolbar"><h2 class="section-title">Tender Pipeline</h2><button class="btn primary" id="addProjectBtn">+ Add New Project</button></div>
+        <div class="toolbar"><h2 class="section-title">Tender Pipeline</h2><button class="btn primary" id="addProjectBtn">+ Add New Project</button><label class="btn sm" style="cursor:pointer;user-select:none"><input type="checkbox" id="pipelineMineOnly" style="margin-right:6px;vertical-align:middle">My Items Only</label></div>
         <div class="table-wrap"><table><thead><tr><th style="width:25%">Project</th><th style="width:13%">Client</th><th style="width:14%">Assignee</th><th style="width:16%">Location</th><th style="width:10%">Status</th><th style="width:10%">Deadline</th><th style="width:12%">Actions</th></tr></thead><tbody id="pipelineBody"></tbody></table></div>
       </section>
 
@@ -493,7 +524,11 @@ const DEFAULT_LOGO_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAicAAACS
 
       <!-- Tasks -->
       <section id="view-tasks" class="view">
-        <div class="toolbar"><button class="btn primary" id="addTaskBtn">+ New Task</button><select class="select" id="taskFilterProject" style="max-width:240px"><option value="all">All Projects</option></select></div>
+        <div class="toolbar">
+          <button class="btn primary" id="addTaskBtn">+ New Task</button>
+          <select class="select" id="taskFilterProject" style="max-width:240px"><option value="all">All Projects</option></select>
+          <label class="btn sm" style="cursor:pointer;user-select:none"><input type="checkbox" id="taskMineOnly" style="margin-right:6px;vertical-align:middle">My Items Only</label>
+        </div>
         <div class="task-board" id="taskBoard"></div>
       </section>
 
@@ -515,6 +550,15 @@ const DEFAULT_LOGO_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAicAAACS
         <!-- Side-by-side comparison panel (visible when a specific package is selected + 2+ quotes) -->
         <div class="cmp-panel hidden" id="cmpPanel"></div>
         <div class="table-wrap"><table style="min-width:920px;table-layout:auto"><thead><tr><th>Vendor</th><th>Project</th><th>Scope</th><th>Package</th><th>Total Price</th><th>Currency</th><th>Lead Time</th><th>Tech Score</th><th>Rank</th><th>Actions</th></tr></thead><tbody id="quoteBody"></tbody></table></div>
+      </section>
+
+      <!-- Activity Log -->
+      <section id="view-activity" class="view">
+        <div class="toolbar">
+          <button class="btn" id="refreshActivityBtn">Refresh</button>
+          <span class="subtle">Shows the most recent 200 events across projects, tasks and quotes.</span>
+        </div>
+        <div class="activity-feed" id="activityFeed"></div>
       </section>
 
       <!-- Settings -->
@@ -740,6 +784,30 @@ const DEFAULT_LOGO_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAicAAACS
             </div>
           </div>
 
+          <!-- ── GROUP: DATA MANAGEMENT (admin only) ── -->
+          <div class="settings-group-header" id="dataMgmtGroupHeader">
+            <div class="settings-group-header-line"></div>
+            <span class="settings-group-header-label">Data Management</span>
+            <div class="settings-group-header-line"></div>
+          </div>
+
+          <!-- Trash / Restore (admin only) -->
+          <div class="settings-section" id="trashSection">
+            <div class="settings-section-head">
+              <div class="settings-section-icon">
+                <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
+              </div>
+              <div>
+                <div class="settings-section-title">Trash</div>
+                <div class="settings-section-sub">Deleted projects, tasks and quotations stay here and can be restored.</div>
+              </div>
+            </div>
+            <div class="settings-section-body">
+              <div class="toolbar" style="margin-bottom:12px"><button class="btn" id="refreshTrashBtn">Refresh</button></div>
+              <div id="trashList"></div>
+            </div>
+          </div>
+
         </div>
       </section>
     </main>
@@ -782,6 +850,14 @@ const DEFAULT_LOGO_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAicAAACS
         <div><label class="label">Status</label><select class="select" id="tStatus"><option>To Do</option><option>In Progress</option><option>For Review</option><option>Done</option></select></div>
         <div class="span2"><label class="label">Description</label><textarea class="textarea" id="tDesc"></textarea></div>
       </div>
+      <div class="comments-wrap">
+        <label class="label">Comments</label>
+        <div class="comments-list" id="tCommentsList"></div>
+        <div class="comment-input-row">
+          <textarea class="textarea" id="tCommentInput" placeholder="Add a comment..."></textarea>
+          <button class="btn primary" id="tCommentPostBtn">Post</button>
+        </div>
+      </div>
       <div class="actions"><button class="btn" data-close="taskModal">Cancel</button><button class="btn primary" id="saveTaskBtn">Save Task</button></div>
     </div>
   </div>
@@ -793,6 +869,14 @@ const DEFAULT_LOGO_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAicAAACS
     <div class="modal-head"><span class="modal-title">Task Details</span><button class="close" data-close="taskViewModal">×</button></div>
     <div class="modal-body">
       <div class="form-row" id="taskViewFields"></div>
+      <div class="comments-wrap">
+        <label class="label">Comments</label>
+        <div class="comments-list" id="vCommentsList"></div>
+        <div class="comment-input-row">
+          <textarea class="textarea" id="vCommentInput" placeholder="Add a comment..."></textarea>
+          <button class="btn primary" id="vCommentPostBtn">Post</button>
+        </div>
+      </div>
       <div class="actions"><button class="btn" data-close="taskViewModal">Close</button></div>
     </div>
   </div>
@@ -958,6 +1042,7 @@ const NAV = [
   ['registry','RFQ Registry','<svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>'],
   ['tasks','Task Manager','<svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>'],
   ['quotes','Quote Compare','<svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>'],
+  ['activity','Activity Log','<svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>'],
   ['settings','Settings','<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>']
 ];
 
@@ -1026,7 +1111,8 @@ let vendorDatabase = { Mechanical:{}, Electrical:{}, Civil:{}, Architecture:{} }
 let currentUser = sessionStorage.getItem('rfq_user') || '';
 let editingProject = null, editingTask = null;
 let selectedSuppliers = [], visibleSuppliers = [], selectedFiles = [], rfqEmail = '', rfqSubject = '', deferredInstallPrompt = null;
-let reminderContext = null; 
+let reminderContext = null;
+let taskMineOnly = false, pipelineMineOnly = false;
 
 // ---------------------------------------------------------
 // HELPERS
@@ -1134,9 +1220,9 @@ async function loadDataFromSupabase(){
   }
   settings.prefs = Object.assign({logoSrc:DEFAULT_LOGO_SVG, rfqBodyTemplate:DEFAULT_RFQ_BODY, reminderBodyTemplate:DEFAULT_REMINDER_BODY}, settings.prefs||{});
 
-  tenders = await fetchTable('tenders');
-  tasks   = await fetchTable('tasks');
-  quotes  = await fetchTable('quotes');
+  tenders = (await fetchTable('tenders')).filter(t=>!t.deleted_at);
+  tasks   = (await fetchTable('tasks')).filter(t=>!t.deleted_at);
+  quotes  = (await fetchTable('quotes')).filter(t=>!t.deleted_at);
   logs    = await fetchTable('rfq_logs');
 
   const rawVendors = await fetchTable('vendors');
@@ -1156,6 +1242,110 @@ async function fetchTable(name){
   return data||[];
 }
 async function saveSettingsToCloud(){ await supabaseClient.from('app_settings').upsert({id:1, payload:settings}); }
+
+// ---------------------------------------------------------
+// GLOBAL SEARCH (client-side, over already-loaded data)
+// ---------------------------------------------------------
+function performGlobalSearch(query){
+  const q=(query||'').trim().toLowerCase();
+  const panel=by('searchPanel');
+  if(!q){ panel.classList.add('hidden'); panel.innerHTML=''; return; }
+  const results=[];
+  tenders.forEach(t=>{
+    if((t.name||'').toLowerCase().includes(q)||(t.ref||'').toLowerCase().includes(q)||(t.client||'').toLowerCase().includes(q)){
+      results.push({type:'Project', title:t.name||t.ref||('Project #'+t.id), action:()=>{ showView('pipeline'); openProject(t.id); }});
+    }
+  });
+  tasks.forEach(t=>{
+    if((t.title||'').toLowerCase().includes(q)||(t.desc||'').toLowerCase().includes(q)){
+      results.push({type:'Task', title:t.title, action:()=>{ showView('tasks'); openTaskSmart(t.id); }});
+    }
+  });
+  quotes.forEach(qt=>{
+    if((qt.vendor||'').toLowerCase().includes(q)||(qt.project||'').toLowerCase().includes(q)||(qt.package||'').toLowerCase().includes(q)){
+      results.push({type:'Quotation', title:(qt.vendor||'Quotation')+(qt.project?' — '+qt.project:''), action:()=>{ showView('quotes'); }});
+    }
+  });
+  if(!results.length){
+    panel.innerHTML='<div class="search-result-item" style="cursor:default">No matches found.</div>';
+    panel.classList.remove('hidden');
+    return;
+  }
+  panel.innerHTML = results.slice(0,30).map((r,i)=>'<div class="search-result-item" data-search-idx="'+i+'"><div class="search-result-type">'+esc(r.type)+'</div><div class="search-result-title">'+esc(r.title)+'</div></div>').join('');
+  panel.classList.remove('hidden');
+  panel.querySelectorAll('[data-search-idx]').forEach(el=>{
+    el.onclick=()=>{
+      results[Number(el.dataset.searchIdx)].action();
+      panel.classList.add('hidden');
+      by('globalSearchInput').value='';
+    };
+  });
+}
+
+// Fire-and-forget activity trail. Never blocks or fails the action it's
+// logging — if the activity_log table isn't there yet or the insert fails,
+// we just note it in the console and move on.
+async function logActivity(entityType, entityId, action, details){
+  try{ await supabaseClient.from('activity_log').insert([{entity_type:entityType, entity_id:entityId, action, actor:currentUser, details}]); }
+  catch(e){ console.error('Activity log failed: '+e.message); }
+}
+
+function relTime(iso){
+  if(!iso) return '';
+  const d=new Date(iso); const diffMs=Date.now()-d.getTime(); const mins=Math.floor(diffMs/60000);
+  if(mins<1) return 'just now';
+  if(mins<60) return mins+'m ago';
+  const hrs=Math.floor(mins/60);
+  if(hrs<24) return hrs+'h ago';
+  const days=Math.floor(hrs/24);
+  if(days<7) return days+'d ago';
+  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+}
+
+async function renderActivityLog(){
+  const el=by('activityFeed');
+  el.innerHTML='<div class="empty">Loading...</div>';
+  try{
+    const {data,error} = await supabaseClient.from('activity_log').select('*').order('created_at',{ascending:false}).limit(200);
+    if(error){ el.innerHTML='<div class="empty">Could not load activity log'+(error.code==='42P01'?' — run the workflow-upgrade SQL script in Supabase first.':': '+esc(error.message))+'</div>'; return; }
+    if(!data||!data.length){ el.innerHTML='<div class="empty">No activity recorded yet.</div>'; return; }
+    el.innerHTML=data.map(a=>{
+      return '<div class="activity-item"><div class="activity-dot"></div><div class="activity-body"><div class="activity-text"><b>'+esc(a.actor||'Someone')+'</b> '+esc(a.details||a.action||'')+'</div><div class="activity-time">'+relTime(a.created_at)+'</div></div></div>';
+    }).join('');
+  }catch(e){ el.innerHTML='<div class="empty">Could not load activity log.</div>'; }
+}
+
+// ---------------------------------------------------------
+// TASK COMMENTS
+// ---------------------------------------------------------
+async function loadTaskComments(taskId){
+  if(!taskId) return [];
+  try{
+    const {data,error} = await supabaseClient.from('task_comments').select('*').eq('task_id',taskId).order('created_at',{ascending:true});
+    if(error){ console.error('Could not load comments: '+error.message); return []; }
+    return data||[];
+  }catch(e){ return []; }
+}
+
+function renderCommentsList(listId, comments){
+  by(listId).innerHTML = comments.length ? comments.map(c=>
+    '<div class="comment-item"><div class="comment-head"><span class="comment-author">'+esc(c.author||'Unknown')+'</span><span class="comment-time">'+relTime(c.created_at)+'</span></div><div class="comment-msg">'+esc(c.message)+'</div></div>'
+  ).join('') : '<div class="empty" style="padding:8px 0">No comments yet.</div>';
+}
+
+async function postTaskComment(taskId, inputId, listId){
+  const input=by(inputId); const message=input.value.trim();
+  if(!message) return;
+  if(!taskId) return toast('Save the task first, then add comments.');
+  const row={task_id:taskId, author:currentUser, message};
+  const {error} = await supabaseClient.from('task_comments').insert([row]);
+  if(error){ toast('Could not post comment: '+error.message); return; }
+  input.value='';
+  const t=tasks.find(x=>x.id===taskId);
+  logActivity('task', taskId, 'commented', currentUser+' commented on "'+(t?t.title:taskId)+'"');
+  const comments = await loadTaskComments(taskId);
+  renderCommentsList(listId, comments);
+}
 
 // ---------------------------------------------------------
 // AUTH
@@ -1216,6 +1406,7 @@ function showView(v){
   if(v==='registry') renderLogs();
   if(v==='tasks') renderTasks();
   if(v==='quotes') renderQuotes();
+  if(v==='activity') renderActivityLog();
   if(v==='settings') renderSettings();
 }
 
@@ -1228,6 +1419,12 @@ function bindStaticEvents(){
   document.addEventListener('click', e=>{
     const wrap=by('notifWrap');
     if(wrap && !wrap.contains(e.target)) by('notifPanel').classList.add('hidden');
+  });
+  by('globalSearchInput').oninput=(e)=>performGlobalSearch(e.target.value);
+  by('globalSearchInput').onfocus=(e)=>{ if(e.target.value.trim()) performGlobalSearch(e.target.value); };
+  document.addEventListener('click', e=>{
+    const wrap=by('searchWrap');
+    if(wrap && !wrap.contains(e.target)) by('searchPanel').classList.add('hidden');
   });
   by('addProjectBtn').onclick=()=>openProject();
   by('saveProjectBtn').onclick=saveProject;
@@ -1250,6 +1447,12 @@ function bindStaticEvents(){
   by('addTaskBtn').onclick=()=>openTask();
   by('saveTaskBtn').onclick=saveTask;
   by('taskFilterProject').onchange=renderTasks;
+  by('taskMineOnly').onchange=e=>{ taskMineOnly=e.target.checked; renderTasks(); };
+  by('pipelineMineOnly').onchange=e=>{ pipelineMineOnly=e.target.checked; renderPipeline(); };
+  by('refreshActivityBtn').onclick=renderActivityLog;
+  by('tCommentPostBtn').onclick=()=>postTaskComment(editingTask, 'tCommentInput', 'tCommentsList');
+  by('vCommentPostBtn').onclick=()=>postTaskComment(Number(by('taskViewModal').dataset.taskId), 'vCommentInput', 'vCommentsList');
+  by('refreshTrashBtn').onclick=renderTrash;
   by('addQuoteBtn').onclick=openQuote;
   by('qScope').onchange=fillQuotePackages;
   by('saveQuoteBtn').onclick=saveQuote;
@@ -1354,7 +1557,8 @@ function renderDashboard(){
 // ---------------------------------------------------------
 function renderPipeline(){
   function statusBadge(s){ const cls={New:'status-new','Under Study':'status-under',Submitted:'status-submitted',Won:'status-won',Lost:'status-lost','On Hold':'status-hold'}[s]||'status-new'; return '<span class="badge '+cls+'">'+esc(s||'New')+'</span>'; }
-  by('pipelineBody').innerHTML=tenders.length?tenders.map(t=>'<tr><td class="wrap"><strong style="color:var(--dark)">'+esc(t.name)+'</strong><div class="mini">'+esc(t.ref||'')+'</div></td><td>'+esc(t.client||'-')+'</td><td class="wrap">'+esc(t.assignee||'-')+'</td><td class="wrap">'+esc(t.location||'-')+'</td><td>'+statusBadge(t.status)+'</td><td>'+esc(t.deadline||'-')+'</td><td><button class="btn sm" data-edit-project="'+t.id+'">Edit</button> <button class="btn sm danger" data-del-project="'+t.id+'">Del</button></td></tr>').join(''):'<tr><td colspan="7" class="empty">No projects yet.</td></tr>';
+  const data = pipelineMineOnly ? tenders.filter(t=>t.assignee===currentUser) : tenders;
+  by('pipelineBody').innerHTML=data.length?data.map(t=>'<tr><td class="wrap"><strong style="color:var(--dark)">'+esc(t.name)+'</strong><div class="mini">'+esc(t.ref||'')+'</div></td><td>'+esc(t.client||'-')+'</td><td class="wrap">'+esc(t.assignee||'-')+'</td><td class="wrap">'+esc(t.location||'-')+'</td><td>'+statusBadge(t.status)+'</td><td>'+esc(t.deadline||'-')+'</td><td><button class="btn sm" data-edit-project="'+t.id+'">Edit</button> <button class="btn sm danger" data-del-project="'+t.id+'">Del</button></td></tr>').join(''):'<tr><td colspan="7" class="empty">No projects yet.</td></tr>';
   by('pipelineBody').querySelectorAll('[data-edit-project]').forEach(b=>b.onclick=()=>openProject(Number(b.dataset.editProject)));
   by('pipelineBody').querySelectorAll('[data-del-project]').forEach(b=>b.onclick=()=>deleteProject(Number(b.dataset.delProject)));
 }
@@ -1384,13 +1588,18 @@ async function saveProject(){
   by('saveProjectBtn').textContent='Save Project';
   if(error){ toast('Could not save project to the cloud: '+error.message); return; }
   by('projectModal').classList.remove('open');
+  logActivity('tender', obj.id, editingProject?'updated':'created', (editingProject?'Updated':'Created')+' project "'+obj.name+'"');
   populateAllSelects(); renderPipeline(); renderDashboard(); renderNotifications(); toast('Project saved to cloud.');
 }
 
 async function deleteProject(id){
-  if(!confirm('Delete this project?')) return;
-  await supabaseClient.from('tenders').delete().eq('id',id); tenders=tenders.filter(t=>t.id!==id);
-  populateAllSelects(); renderPipeline(); renderDashboard(); toast('Project deleted.');
+  if(!confirm('Delete this project? You can restore it later from Settings → Trash.')) return;
+  const t=tenders.find(x=>x.id===id);
+  const {error} = await supabaseClient.from('tenders').update({deleted_at:new Date().toISOString()}).eq('id',id);
+  if(error){ toast('Could not delete project: '+error.message); return; }
+  tenders=tenders.filter(t=>t.id!==id);
+  logActivity('tender', id, 'deleted', 'Deleted project "'+(t?t.name:id)+'"');
+  populateAllSelects(); renderPipeline(); renderDashboard(); toast('Project moved to Trash.');
 }
 
 // ---------------------------------------------------------
@@ -1683,6 +1892,15 @@ function openTask(id){
   by('tPriority').value=t.priority||'Medium'; by('tDue').value=t.due||''; by('tScope').value=t.scope||'';
   by('tStatus').value=t.status||'To Do'; by('tDesc').value=t.desc||'';
   by('taskModal').classList.add('open');
+  by('tCommentInput').value='';
+  if(editingTask){
+    by('tCommentInput').disabled=false; by('tCommentPostBtn').disabled=false;
+    by('tCommentsList').innerHTML='<div class="empty" style="padding:8px 0">Loading...</div>';
+    loadTaskComments(editingTask).then(c=>renderCommentsList('tCommentsList', c));
+  } else {
+    by('tCommentInput').disabled=true; by('tCommentPostBtn').disabled=true;
+    by('tCommentsList').innerHTML='<div class="empty" style="padding:8px 0">Save the task first, then add comments.</div>';
+  }
 }
 
 function viewTask(id){
@@ -1697,6 +1915,10 @@ function viewTask(id){
     '<div><label class="label">Status</label><div class="view-field">'+esc(t.status||'-')+'</div></div>'+
     '<div class="span2"><label class="label">Description</label><div class="view-field view-desc">'+esc(t.desc||'No description provided.')+'</div></div>';
   by('taskViewModal').classList.add('open');
+  by('taskViewModal').dataset.taskId=id;
+  by('vCommentInput').value='';
+  by('vCommentsList').innerHTML='<div class="empty" style="padding:8px 0">Loading...</div>';
+  loadTaskComments(id).then(c=>renderCommentsList('vCommentsList', c));
 }
 
 function openTaskSmart(id){
@@ -1708,6 +1930,7 @@ async function saveTask(){
   const title=by('tTitle').value.trim(); if(!title) return toast('Task title is required.');
   by('saveTaskBtn').textContent='Saving...';
   const obj={title, project:by('tProject').value, assignee:by('tAssignee').value, priority:by('tPriority').value, due:by('tDue').value, scope:by('tScope').value, status:by('tStatus').value, desc:by('tDesc').value.trim()};
+  const isNew=!editingTask;
   let error;
   if(editingTask){
     obj.id=editingTask;
@@ -1726,43 +1949,69 @@ async function saveTask(){
     toast('Could not save task to the cloud: '+error.message);
     return;
   }
-  by('taskModal').classList.remove('open'); renderTasks(); renderNotifications(); toast('Task saved to cloud.');
+  by('taskModal').classList.remove('open'); renderTasks(); renderNotifications();
+  logActivity('task', obj.id, isNew?'created':'updated', (isNew?'Created':'Updated')+' task "'+obj.title+'"'+(obj.assignee?' (assigned to '+obj.assignee+')':''));
+  toast('Task saved to cloud.');
+}
+
+async function moveTaskTo(id, newStatus){
+  const t=tasks.find(x=>x.id===id);
+  if(!t||t.status===newStatus) return;
+  const prevStatus=t.status; t.status=newStatus;
+  const {error} = await supabaseClient.from('tasks').update({status:newStatus}).eq('id',id);
+  if(error){ t.status=prevStatus; toast('Could not update task: '+error.message); renderTasks(); return; }
+  logActivity('task', id, 'status_changed', '"'+t.title+'" moved from '+prevStatus+' to '+newStatus);
+  renderTasks(); renderNotifications();
 }
 
 function renderTasks(){
-  const pf=by('taskFilterProject').value; const data=pf==='all'?tasks:tasks.filter(t=>t.project===pf);
+  const pf=by('taskFilterProject').value;
+  let data=pf==='all'?tasks:tasks.filter(t=>t.project===pf);
+  if(taskMineOnly) data=data.filter(t=>t.assignee===currentUser||t.createdBy===currentUser);
   by('taskBoard').innerHTML=TASK_STATUSES.map(s=>{
     const col=data.filter(t=>t.status===s);
-    return '<div class="task-col"><div class="task-head"><span>'+s+'</span><span>'+col.length+'</span></div>'+(col.map(t=>{
+    return '<div class="task-col" data-col-status="'+s+'"><div class="task-head"><span>'+s+'</span><span>'+col.length+'</span></div>'+(col.map(t=>{
       // Only the person who originally created/assigned the task can delete it —
       // deleting is a management action, not something an assignee should be able to do.
       const canDelete = isTaskOwner(t);
-      return '<div class="task-card '+(String(t.priority).toLowerCase())+'" data-open-task="'+t.id+'"><div class="task-title">'+esc(t.title)+'</div><div class="meta">'+esc(t.project||'-')+'<br>'+esc(t.assignee||'-')+' · '+esc(t.due||'No due date')+'</div><div class="toolbar" style="margin:8px 0 0">'+TASK_STATUSES.filter(x=>x!==s).map(x=>'<button class="btn sm" data-move-task="'+t.id+'" data-status="'+x+'">'+x+'</button>').join('')+(canDelete?'<button class="btn sm danger" data-delete-task="'+t.id+'">Del</button>':'')+'</div></div>';
+      return '<div class="task-card '+(String(t.priority).toLowerCase())+'" draggable="true" data-open-task="'+t.id+'"><div class="task-title">'+esc(t.title)+'</div><div class="meta">'+esc(t.project||'-')+'<br>'+esc(t.assignee||'-')+' · '+esc(t.due||'No due date')+'</div><div class="toolbar" style="margin:8px 0 0">'+TASK_STATUSES.filter(x=>x!==s).map(x=>'<button class="btn sm" data-move-task="'+t.id+'" data-status="'+x+'">'+x+'</button>').join('')+(canDelete?'<button class="btn sm danger" data-delete-task="'+t.id+'">Del</button>':'')+'</div></div>';
     }).join('')||'<div class="empty">No tasks</div>')+'</div>';
   }).join('');
   // Clicking anywhere on the card (but not its buttons) opens the full task —
   // the creator gets the editable form, everyone else gets a read-only summary.
-  by('taskBoard').querySelectorAll('[data-open-task]').forEach(card=>card.onclick=(e)=>{
-    if(e.target.closest('button')) return;
-    openTaskSmart(Number(card.dataset.openTask));
+  by('taskBoard').querySelectorAll('[data-open-task]').forEach(card=>{
+    card.onclick=(e)=>{
+      if(e.target.closest('button')) return;
+      openTaskSmart(Number(card.dataset.openTask));
+    };
+    // Drag-and-drop: pick up a card and drop it on another column to change status.
+    card.ondragstart=(e)=>{ e.dataTransfer.setData('text/plain', card.dataset.openTask); card.classList.add('dragging'); };
+    card.ondragend=()=>card.classList.remove('dragging');
   });
-  by('taskBoard').querySelectorAll('[data-move-task]').forEach(b=>b.onclick=async (e)=>{
+  by('taskBoard').querySelectorAll('[data-col-status]').forEach(col=>{
+    col.ondragover=(e)=>{ e.preventDefault(); col.classList.add('drag-over'); };
+    col.ondragleave=()=>col.classList.remove('drag-over');
+    col.ondrop=(e)=>{
+      e.preventDefault(); col.classList.remove('drag-over');
+      const id=Number(e.dataTransfer.getData('text/plain'));
+      if(id) moveTaskTo(id, col.dataset.colStatus);
+    };
+  });
+  by('taskBoard').querySelectorAll('[data-move-task]').forEach(b=>b.onclick=(e)=>{
     e.stopPropagation();
-    const t=tasks.find(x=>x.id===Number(b.dataset.moveTask));
-    if(t){
-      const prevStatus=t.status; t.status=b.dataset.status;
-      const {error} = await supabaseClient.from('tasks').update({status:t.status}).eq('id',t.id);
-      if(error){ t.status=prevStatus; toast('Could not update task: '+error.message); }
-      renderTasks(); renderNotifications();
-    }
+    moveTaskTo(Number(b.dataset.moveTask), b.dataset.status);
   });
   by('taskBoard').querySelectorAll('[data-delete-task]').forEach(b=>b.onclick=async (e)=>{
     e.stopPropagation();
-    if(confirm('Delete this task?')){
+    if(confirm('Delete this task? You can restore it later from Settings → Trash.')){
       const id=Number(b.dataset.deleteTask);
-      const {error} = await supabaseClient.from('tasks').delete().eq('id',id);
+      const t=tasks.find(x=>x.id===id);
+      const {error} = await supabaseClient.from('tasks').update({deleted_at:new Date().toISOString()}).eq('id',id);
       if(error){ toast('Could not delete task: '+error.message); return; }
-      tasks=tasks.filter(t=>t.id!==id); renderTasks(); renderNotifications();
+      tasks=tasks.filter(t=>t.id!==id);
+      logActivity('task', id, 'deleted', 'Deleted task "'+(t?t.title:id)+'"');
+      renderTasks(); renderNotifications();
+      toast('Task moved to Trash.');
     }
   });
 }
@@ -1787,13 +2036,14 @@ async function refreshLiveData(){
   if(!supabaseClient||!currentUser) return;
   try{
     const [freshTasks, freshTenders] = await Promise.all([fetchTable('tasks'), fetchTable('tenders')]);
-    tasks = freshTasks; tenders = freshTenders;
+    tasks = freshTasks.filter(t=>!t.deleted_at); tenders = freshTenders.filter(t=>!t.deleted_at);
     const activeView = document.querySelector('.view.active');
     if(activeView){
       const id = activeView.id.replace('view-','');
       if(id==='tasks') renderTasks();
       if(id==='pipeline') renderPipeline();
       if(id==='dashboard') renderDashboard();
+      if(id==='activity') renderActivityLog();
     }
     renderNotifications();
   }catch(e){ console.error('Live sync refresh failed: '+e.message); }
@@ -1980,6 +2230,47 @@ function renderSettings(){
   by('rfqTemplateSection').classList.toggle('hidden',!admin);
   by('reminderTemplateSection').classList.toggle('hidden',!admin);
   by('brandIdentitySection').classList.toggle('hidden',!admin);
+  by('dataMgmtGroupHeader').classList.toggle('hidden',!admin);
+  by('trashSection').classList.toggle('hidden',!admin);
+  if(admin) renderTrash();
+}
+
+// ---------------------------------------------------------
+// TRASH / RESTORE (admin only — deleted rows are only ever soft-deleted,
+// so nothing here is ever unrecoverable except via the database itself)
+// ---------------------------------------------------------
+async function fetchDeleted(table){
+  try{
+    const {data,error} = await supabaseClient.from(table).select('*').not('deleted_at','is',null).order('deleted_at',{ascending:false});
+    if(error){ console.error('Could not load trash for '+table+': '+error.message); return []; }
+    return data||[];
+  }catch(e){ return []; }
+}
+
+async function renderTrash(){
+  const el=by('trashList');
+  el.innerHTML='<div class="empty">Loading...</div>';
+  const [deletedTasks, deletedTenders, deletedQuotes] = await Promise.all([fetchDeleted('tasks'), fetchDeleted('tenders'), fetchDeleted('quotes')]);
+  const rows = [
+    ...deletedTasks.map(t=>({table:'tasks', id:t.id, label:'Task: '+(t.title||t.id), when:t.deleted_at})),
+    ...deletedTenders.map(t=>({table:'tenders', id:t.id, label:'Project: '+(t.name||t.id), when:t.deleted_at})),
+    ...deletedQuotes.map(t=>({table:'quotes', id:t.id, label:'Quotation: '+(t.vendor||t.id), when:t.deleted_at})),
+  ].sort((a,b)=>new Date(b.when)-new Date(a.when));
+  if(!rows.length){ el.innerHTML='<div class="empty">Trash is empty.</div>'; return; }
+  el.innerHTML = rows.map(r=>
+    '<div class="activity-item"><div class="activity-body"><div class="activity-text">'+esc(r.label)+'<div class="activity-time">Deleted '+relTime(r.when)+'</div></div></div><button class="btn sm" data-restore-table="'+r.table+'" data-restore-id="'+r.id+'">Restore</button></div>'
+  ).join('');
+  el.querySelectorAll('[data-restore-table]').forEach(b=>b.onclick=async ()=>{
+    const table=b.dataset.restoreTable, id=Number(b.dataset.restoreId);
+    const {error} = await supabaseClient.from(table).update({deleted_at:null}).eq('id',id);
+    if(error){ toast('Could not restore: '+error.message); return; }
+    if(table==='tasks'){ const row=(await supabaseClient.from('tasks').select('*').eq('id',id).single()).data; if(row) tasks.push(row); renderTasks(); }
+    if(table==='tenders'){ const row=(await supabaseClient.from('tenders').select('*').eq('id',id).single()).data; if(row) tenders.push(row); renderPipeline(); populateAllSelects(); renderDashboard(); }
+    if(table==='quotes'){ const row=(await supabaseClient.from('quotes').select('*').eq('id',id).single()).data; if(row) quotes.push(row); renderQuotes(); }
+    logActivity(table.slice(0,-1), id, 'restored', 'Restored from Trash');
+    toast('Restored.');
+    renderTrash();
+  });
 }
 
 // Ahmed Ramadan is the sole workspace admin — identified by his account's
