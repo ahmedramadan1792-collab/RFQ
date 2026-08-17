@@ -556,8 +556,8 @@ const DEFAULT_LOGO_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/200
             <div class="settings-group-header-line"></div>
           </div>
 
-          <!-- Brand Identity -->
-          <div class="settings-section">
+          <!-- Brand Identity (admin only) -->
+          <div class="settings-section" id="brandIdentitySection">
             <div class="settings-section-head">
               <div class="settings-section-icon">
                 <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
@@ -1270,20 +1270,22 @@ function bindStaticEvents(){
   // Logo Events
   const fileInput = by('logoFile'), resetLogoBtn = by('resetLogoBtn');
   if(fileInput) fileInput.onchange = e => {
+      if(!isAdmin()){ toast('Only the workspace admin can change the logo.'); e.target.value=''; return; }
       const f = e.target.files[0]; if(!f) return;
-      const reader = new FileReader(); 
+      const reader = new FileReader();
       reader.onload = async ev => {
           settings.prefs.logoSrc = ev.target.result;
-          await saveSettingsToCloud(); 
-          applyLogos(); 
+          await saveSettingsToCloud();
+          applyLogos();
           toast('Workspace logo updated on cloud.');
       };
       reader.readAsDataURL(f); e.target.value = '';
   };
   if(resetLogoBtn) resetLogoBtn.onclick = async () => {
+      if(!isAdmin()) return toast('Only the workspace admin can change the logo.');
       settings.prefs.logoSrc = DEFAULT_LOGO_SVG;
-      await saveSettingsToCloud(); 
-      applyLogos(); 
+      await saveSettingsToCloud();
+      applyLogos();
       toast('App logo restored to default.');
   };
 
@@ -1971,10 +1973,12 @@ function renderSettings(){
   renderCustomSuppliers();
   by('rfqBodyTemplate').value = rfqBodyTemplate();
   by('reminderBodyTemplate').value = reminderBodyTemplate();
-  // Email templates are workspace-wide, so only the admin should see or edit them.
+  // Email templates and the workspace logo are shared, workspace-wide settings,
+  // so only the admin should see or edit them.
   const admin=isAdmin();
   by('rfqTemplateSection').classList.toggle('hidden',!admin);
   by('reminderTemplateSection').classList.toggle('hidden',!admin);
+  by('brandIdentitySection').classList.toggle('hidden',!admin);
 }
 
 // Ahmed Ramadan is the sole workspace admin — identified by his account's
