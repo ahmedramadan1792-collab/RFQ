@@ -93,6 +93,18 @@ main { flex: 1; overflow-y: auto; padding: 32px; background: var(--surface); }
 .topbar-logo-icon { width: 24px; height: 24px; border-radius: 4px; object-fit: contain; }
 .page-title { font-family: 'Montserrat', sans-serif; font-size: 18px; font-weight: 700; color: var(--dark); letter-spacing: -0.3px; display: flex; align-items: center; gap: 10px; }
 .header-actions { display: flex; align-items: center; gap: 16px; }
+.notif-wrap { position: relative; }
+.notif-btn { position: relative; border: 1px solid var(--border); background: #fff; color: var(--muted); border-radius: 50%; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; }
+.notif-btn:hover { background: #f1f3f4; color: var(--dark); }
+.notif-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.notif-badge { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; }
+.notif-panel { position: absolute; top: 46px; right: 0; width: 340px; max-height: 420px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.16); z-index: 100; }
+.notif-panel-head { padding: 14px 16px; font-weight: 700; font-family: 'Montserrat', sans-serif; font-size: 13px; color: var(--dark); border-bottom: 1px solid var(--border); }
+.notif-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.notif-item:last-child { border-bottom: 0; }
+.notif-item-title { font-weight: 600; font-size: 12.5px; color: var(--dark); }
+.notif-item-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.notif-item > span.days { flex-shrink: 0; }
 .pill { background: #f1f3f4; color: var(--dark); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-weight: 600; font-size: 12px; }
 .date { color: var(--muted); font-weight: 500; font-size: 12px; }
 
@@ -362,6 +374,16 @@ const DEFAULT_LOGO_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/200
       </div>
       <div class="header-actions">
         <span class="date" id="todayDate"></span>
+        <div class="notif-wrap" id="notifWrap">
+          <button class="notif-btn" id="notifBtn" title="Notifications">
+            <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <span class="notif-badge hidden" id="notifBadge">0</span>
+          </button>
+          <div class="notif-panel hidden" id="notifPanel">
+            <div class="notif-panel-head">Notifications</div>
+            <div class="notif-list" id="notifList"></div>
+          </div>
+        </div>
         <span class="pill" id="userBadge"></span>
         <button class="btn sm" id="signoutBtn">Sign Out</button>
       </div>
@@ -897,6 +919,7 @@ const NAV = [
 ];
 
 const TASK_STATUSES = ['To Do','In Progress','For Review','Done'];
+const NOTIF_DUE_SOON_DAYS = 3;
 
 const DEFAULT_RFQ_BODY = `Dear Sir,
 
@@ -1118,6 +1141,8 @@ function launchApp(){
   by('userBadge').textContent=currentUser;
   by('todayDate').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'short',year:'numeric'});
   applyLogos(); populateAllSelects(); renderNav(); showView('dashboard');
+  renderNotifications();
+  startLiveSync();
 }
 
 function signOut(){
@@ -1155,6 +1180,11 @@ function bindStaticEvents(){
   document.querySelectorAll('input[type="date"]').forEach(el=>{ el.onclick=function(){ try{this.showPicker();}catch(e){} }; });
 
   by('signoutBtn').onclick=signOut;
+  by('notifBtn').onclick=(e)=>{ e.stopPropagation(); toggleNotifPanel(); };
+  document.addEventListener('click', e=>{
+    const wrap=by('notifWrap');
+    if(wrap && !wrap.contains(e.target)) by('notifPanel').classList.add('hidden');
+  });
   by('addProjectBtn').onclick=()=>openProject();
   by('saveProjectBtn').onclick=saveProject;
   by('rfqTender').onchange=generatePreview;
@@ -1294,14 +1324,20 @@ async function saveProject(){
   const name=by('pName').value.trim(); if(!name) return toast('Project name is required.');
   by('saveProjectBtn').textContent='Saving...';
   const obj={name, ref:by('pRef').value.trim(), client:by('pClient').value.trim(), pm:by('pPm').value.trim(), consultant:by('pConsultant').value.trim(), assignee:by('pAssignee').value, location:by('pLocation').value.trim(), status:by('pStatus').value, deadline:by('pDeadline').value};
+  let error;
   if(editingProject){
-    obj.id=editingProject; await supabaseClient.from('tenders').update(obj).eq('id',obj.id);
-    const i=tenders.findIndex(t=>t.id===editingProject); if(i>-1) tenders[i]=Object.assign({},tenders[i],obj);
+    obj.id=editingProject;
+    ({error} = await supabaseClient.from('tenders').update(obj).eq('id',obj.id));
+    if(!error){ const i=tenders.findIndex(t=>t.id===editingProject); if(i>-1) tenders[i]=Object.assign({},tenders[i],obj); }
   } else {
-    obj.id=Date.now(); await supabaseClient.from('tenders').insert([obj]); tenders.push(obj);
+    obj.id=Date.now();
+    ({error} = await supabaseClient.from('tenders').insert([obj]));
+    if(!error) tenders.push(obj);
   }
-  by('saveProjectBtn').textContent='Save Project'; by('projectModal').classList.remove('open');
-  populateAllSelects(); renderPipeline(); renderDashboard(); toast('Project saved to cloud.');
+  by('saveProjectBtn').textContent='Save Project';
+  if(error){ toast('Could not save project to the cloud: '+error.message); return; }
+  by('projectModal').classList.remove('open');
+  populateAllSelects(); renderPipeline(); renderDashboard(); renderNotifications(); toast('Project saved to cloud.');
 }
 
 async function deleteProject(id){
@@ -1602,13 +1638,25 @@ async function saveTask(){
   const title=by('tTitle').value.trim(); if(!title) return toast('Task title is required.');
   by('saveTaskBtn').textContent='Saving...';
   const obj={title, project:by('tProject').value, assignee:by('tAssignee').value, priority:by('tPriority').value, due:by('tDue').value, scope:by('tScope').value, status:by('tStatus').value, desc:by('tDesc').value.trim()};
+  let error;
   if(editingTask){
-    obj.id=editingTask; await supabaseClient.from('tasks').update(obj).eq('id',obj.id);
-    const i=tasks.findIndex(t=>t.id===editingTask); if(i>-1) tasks[i]=Object.assign({},tasks[i],obj);
+    obj.id=editingTask;
+    ({error} = await supabaseClient.from('tasks').update(obj).eq('id',obj.id));
+    if(!error){ const i=tasks.findIndex(t=>t.id===editingTask); if(i>-1) tasks[i]=Object.assign({},tasks[i],obj); }
   } else {
-    obj.id=Date.now(); obj.createdBy=currentUser; await supabaseClient.from('tasks').insert([obj]); tasks.push(obj);
+    obj.id=Date.now(); obj.createdBy=currentUser;
+    ({error} = await supabaseClient.from('tasks').insert([obj]));
+    if(!error) tasks.push(obj);
   }
-  by('saveTaskBtn').textContent='Save Task'; by('taskModal').classList.remove('open'); renderTasks(); toast('Task saved to cloud.');
+  by('saveTaskBtn').textContent='Save Task';
+  if(error){
+    // IMPORTANT: do not close the modal or touch the local task list on failure —
+    // previously the app pretended to save even when the cloud write failed,
+    // which is why tasks silently never reached other users.
+    toast('Could not save task to the cloud: '+error.message);
+    return;
+  }
+  by('taskModal').classList.remove('open'); renderTasks(); renderNotifications(); toast('Task saved to cloud.');
 }
 
 function renderTasks(){
@@ -1619,11 +1667,115 @@ function renderTasks(){
   }).join('');
   by('taskBoard').querySelectorAll('[data-move-task]').forEach(b=>b.onclick=async ()=>{
     const t=tasks.find(x=>x.id===Number(b.dataset.moveTask));
-    if(t){ t.status=b.dataset.status; await supabaseClient.from('tasks').update({status:t.status}).eq('id',t.id); renderTasks(); }
+    if(t){
+      const prevStatus=t.status; t.status=b.dataset.status;
+      const {error} = await supabaseClient.from('tasks').update({status:t.status}).eq('id',t.id);
+      if(error){ t.status=prevStatus; toast('Could not update task: '+error.message); }
+      renderTasks(); renderNotifications();
+    }
   });
   by('taskBoard').querySelectorAll('[data-delete-task]').forEach(b=>b.onclick=async ()=>{
-    if(confirm('Delete this task?')){ const id=Number(b.dataset.deleteTask); await supabaseClient.from('tasks').delete().eq('id',id); tasks=tasks.filter(t=>t.id!==id); renderTasks(); }
+    if(confirm('Delete this task?')){
+      const id=Number(b.dataset.deleteTask);
+      const {error} = await supabaseClient.from('tasks').delete().eq('id',id);
+      if(error){ toast('Could not delete task: '+error.message); return; }
+      tasks=tasks.filter(t=>t.id!==id); renderTasks(); renderNotifications();
+    }
   });
+}
+
+// ---------------------------------------------------------
+// LIVE SYNC — keeps tasks/tenders in sync across everyone's
+// open sessions, since they only ever loaded once at sign-in.
+// ---------------------------------------------------------
+let liveSyncStarted=false;
+function startLiveSync(){
+  if(liveSyncStarted) return; liveSyncStarted=true;
+  setInterval(refreshLiveData, 20000); // safety-net poll every 20s, works even without Realtime enabled
+  try{
+    supabaseClient.channel('rfq-live-changes')
+      .on('postgres_changes', {event:'*', schema:'public', table:'tasks'}, refreshLiveData)
+      .on('postgres_changes', {event:'*', schema:'public', table:'tenders'}, refreshLiveData)
+      .subscribe();
+  }catch(e){ /* Realtime replication may not be enabled on this Supabase project — the poll above still covers it */ }
+}
+
+async function refreshLiveData(){
+  if(!supabaseClient||!currentUser) return;
+  try{
+    const [freshTasks, freshTenders] = await Promise.all([fetchTable('tasks'), fetchTable('tenders')]);
+    tasks = freshTasks; tenders = freshTenders;
+    const activeView = document.querySelector('.view.active');
+    if(activeView){
+      const id = activeView.id.replace('view-','');
+      if(id==='tasks') renderTasks();
+      if(id==='pipeline') renderPipeline();
+      if(id==='dashboard') renderDashboard();
+    }
+    renderNotifications();
+  }catch(e){ console.error('Live sync refresh failed: '+e.message); }
+}
+
+// ---------------------------------------------------------
+// NOTIFICATIONS
+// ---------------------------------------------------------
+function seenTaskKey(){ return 'rfq_seen_tasks_'+currentUser; }
+function getSeenTaskIds(){ try{ return JSON.parse(localStorage.getItem(seenTaskKey())||'[]'); }catch(e){ return []; } }
+function markTasksSeen(ids){ try{ localStorage.setItem(seenTaskKey(), JSON.stringify(ids)); }catch(e){} }
+
+function computeNotifications(){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const seen=new Set(getSeenTaskIds());
+  const taskItems=[];
+  tasks.filter(t=>t.assignee&&t.assignee===currentUser&&t.status!=='Done').forEach(t=>{
+    let dayDiff=null;
+    if(t.due){ dayDiff=Math.ceil((new Date(t.due)-today)/86400000); }
+    const isNew=!seen.has(t.id);
+    if(dayDiff!==null&&dayDiff<0) taskItems.push({type:'overdue', task:t, dayDiff});
+    else if(dayDiff!==null&&dayDiff<=NOTIF_DUE_SOON_DAYS) taskItems.push({type:'due-soon', task:t, dayDiff});
+    else if(isNew) taskItems.push({type:'new', task:t, dayDiff});
+  });
+  const tenderItems=[];
+  tenders.filter(t=>t.assignee&&t.assignee===currentUser&&t.deadline&&['New','Under Study','Submitted'].includes(t.status)).forEach(t=>{
+    const dayDiff=Math.ceil((new Date(t.deadline)-today)/86400000);
+    if(dayDiff<=NOTIF_DUE_SOON_DAYS) tenderItems.push({type:dayDiff<0?'overdue':'due-soon', tender:t, dayDiff});
+  });
+  taskItems.sort((a,b)=>(a.dayDiff??999)-(b.dayDiff??999));
+  tenderItems.sort((a,b)=>a.dayDiff-b.dayDiff);
+  return {taskItems, tenderItems};
+}
+
+function renderNotifications(){
+  if(!by('notifBtn')) return;
+  const {taskItems, tenderItems} = computeNotifications();
+  const total = taskItems.length + tenderItems.length;
+  const badge = by('notifBadge');
+  if(total>0){ badge.textContent = total>9?'9+':String(total); badge.classList.remove('hidden'); }
+  else { badge.classList.add('hidden'); }
+
+  const rows=[];
+  taskItems.forEach(i=>{
+    const t=i.task;
+    const label = i.type==='overdue' ? ('Overdue '+Math.abs(i.dayDiff)+'d') : i.type==='due-soon' ? (i.dayDiff===0?'Due today':'Due in '+i.dayDiff+'d') : 'New';
+    const cls = i.type==='overdue'?'bad':i.type==='due-soon'?'warn':'ok';
+    rows.push('<div class="notif-item"><div><div class="notif-item-title">'+esc(t.title)+'</div><div class="notif-item-meta">'+esc(t.project||'General task')+(t.due?' · Due '+esc(t.due):' · No due date')+'</div></div><span class="days '+cls+'">'+label+'</span></div>');
+  });
+  tenderItems.forEach(i=>{
+    const t=i.tender;
+    const label = i.type==='overdue' ? ('Overdue '+Math.abs(i.dayDiff)+'d') : (i.dayDiff===0?'Due today':'Due in '+i.dayDiff+'d');
+    rows.push('<div class="notif-item"><div><div class="notif-item-title">'+esc(t.name)+'</div><div class="notif-item-meta">Tender deadline · '+esc(t.deadline)+'</div></div><span class="days '+(i.type==='overdue'?'bad':'warn')+'">'+label+'</span></div>');
+  });
+  by('notifList').innerHTML = rows.length ? rows.join('') : '<div class="empty" style="padding:24px 16px">You\'re all caught up — no notifications.</div>';
+}
+
+function toggleNotifPanel(){
+  const panel=by('notifPanel');
+  const willOpen=panel.classList.contains('hidden');
+  panel.classList.toggle('hidden');
+  if(willOpen){
+    markTasksSeen(tasks.filter(t=>t.assignee===currentUser).map(t=>t.id));
+    renderNotifications();
+  }
 }
 
 // ---------------------------------------------------------
