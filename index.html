@@ -76,8 +76,10 @@ button, input, select, textarea { font: inherit; }
 /* ---- APP LAYOUT ---- */
 .app-layout { display: flex; height: 100vh; overflow: hidden; background: var(--surface); }
 .sidebar { width: 260px; background: var(--bg-sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 30; }
-.sidebar-brand { padding: 24px 20px; display: flex; align-items: center; }
-.sidebar-logo-icon { width: 100%; max-width: 160px; height: auto; max-height: 42px; object-fit: contain; object-position: left center; }
+.sidebar-brand { padding: 24px 20px; display: flex; align-items: center; gap: 10px; }
+.sidebar-logo-icon { width: auto; height: 34px; max-width: 60px; object-fit: contain; flex-shrink: 0; }
+.sidebar-brand .brand-title { font-family: 'Montserrat', sans-serif; font-size: 15px; font-weight: 800; color: var(--dark); letter-spacing: -0.2px; line-height: 1.2; }
+.sidebar-brand .brand-sub { font-size: 9.5px; color: var(--primary); font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; margin-top: 2px; }
 
 .nav { display: flex; flex-direction: column; gap: 2px; padding: 12px; flex: 1; overflow-y: auto; }
 .tab { border: 0; background: transparent; border-radius: 24px; color: var(--muted); padding: 10px 16px; font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 12px; text-align: left; }
@@ -387,6 +389,10 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
   <aside class="sidebar">
     <div class="sidebar-brand">
       <img id="sidebarLogoIcon" class="sidebar-logo-icon" alt="RFQ Smarter">
+      <div>
+        <div class="brand-title">RFQ Smarter</div>
+        <div class="brand-sub">Workspace</div>
+      </div>
     </div>
     <nav class="nav" id="nav"></nav>
   </aside>
@@ -1121,20 +1127,22 @@ function toast(msg){ const t=by('toast'); t.textContent=msg; t.classList.add('sh
 
 function applyLogos(){
   const src = settings.prefs?.logoSrc || DEFAULT_LOGO_SVG;
-  // The sign-in screens use the icon only (no "RFQ SMARTER" text baked into
-  // the image) since the stylized title text right below it already says
-  // the name — showing both was redundant. Everywhere else (sidebar, top
-  // bar, settings preview) keeps the full icon+wordmark lockup. If the
+  // The sign-in screens and the sidebar use the icon only (no "RFQ SMARTER"
+  // text baked into the image) — a small icon next to a clean text label is
+  // the pattern most professional platforms (Slack, Notion, Linear, etc.)
+  // use, and it reads better small than trying to shrink a wide wordmark
+  // image into a tight space. The top bar and the settings preview still
+  // use the full icon+wordmark lockup since there's more room there. If the
   // admin has uploaded a custom logo, we can't safely auto-crop an
-  // arbitrary image to "icon only", so the sign-in screens just fall back
-  // to showing that custom logo in full there too.
+  // arbitrary image to "icon only", so those spots just fall back to
+  // showing that custom logo in full instead.
   const isCustomLogo = !!(settings.prefs && settings.prefs.logoSrc && settings.prefs.logoSrc !== DEFAULT_LOGO_SVG);
-  const signinSrc = isCustomLogo ? src : DEFAULT_LOGO_ICON_SVG;
-  ['signinLogoImg','supaSetupLogoImg'].forEach(id=>{
+  const iconOnlySrc = isCustomLogo ? src : DEFAULT_LOGO_ICON_SVG;
+  ['signinLogoImg','supaSetupLogoImg','sidebarLogoIcon'].forEach(id=>{
       const el = by(id);
-      if(el) el.src = signinSrc;
+      if(el) el.src = iconOnlySrc;
   });
-  ['sidebarLogoIcon','topbarLogoIcon','logoPreview'].forEach(id=>{
+  ['topbarLogoIcon','logoPreview'].forEach(id=>{
       const el = by(id);
       if(el) el.src = src;
   });
