@@ -521,6 +521,34 @@ const DEFAULT_LOGO_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/200
       <section id="view-settings" class="view">
         <div class="settings-page">
 
+          <!-- ── GROUP: MY ACCOUNT ── -->
+          <div class="settings-group-header">
+            <div class="settings-group-header-line"></div>
+            <span class="settings-group-header-label">My Account</span>
+            <div class="settings-group-header-line"></div>
+          </div>
+
+          <!-- Change My Password -->
+          <div class="settings-section">
+            <div class="settings-section-head">
+              <div class="settings-section-icon">
+                <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              </div>
+              <div>
+                <div class="settings-section-title">Change My Password</div>
+                <div class="settings-section-sub">Only you can change your own sign-in password — nobody else's.</div>
+              </div>
+            </div>
+            <div class="settings-section-body">
+              <div class="form-row">
+                <input class="input" type="password" id="myCurrentPass" placeholder="Current password *">
+                <input class="input" type="password" id="myNewPass" placeholder="New password *">
+                <input class="input" type="password" id="myNewPass2" placeholder="Confirm new password *">
+              </div>
+              <button class="btn primary" id="changeMyPassBtn" style="margin-top:20px">Update Password</button>
+            </div>
+          </div>
+
           <!-- ── GROUP: WORKSPACE IDENTITY ── -->
           <div class="settings-group-header">
             <div class="settings-group-header-line"></div>
@@ -597,7 +625,8 @@ const DEFAULT_LOGO_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/200
             </div>
             <div class="settings-section-body">
               <div id="teamMemberList"></div>
-              <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border)">
+              <div class="subtle hidden" id="addMemberAdminNotice" style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border)">Only the workspace admin can add team members or set their initial passwords. Everyone can update their own password under "My Account" above.</div>
+              <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border)" id="addMemberWrap">
                 <div class="chart-title" style="margin-bottom:16px">Add New Team Member</div>
                 <div class="form-row">
                   <input class="input" id="newMemberName" placeholder="Full name *">
@@ -1228,6 +1257,7 @@ function bindStaticEvents(){
   by('quoteFilterPackage').onchange=renderQuotes;
   by('exportQuotesBtn').onclick=()=>exportCSV('RFQ_Quotations.csv',quoteRows());
   by('addMemberBtn').onclick=addMember;
+  by('changeMyPassBtn').onclick=changeMyPassword;
   by('saveLeadsBtn').onclick=saveLeads;
   by('addSupplierBtn').onclick=addSupplier;
   by('saveRfqTemplateBtn').onclick=saveRfqTemplate;
@@ -1943,10 +1973,39 @@ function renderSettings(){
   by('reminderBodyTemplate').value = reminderBodyTemplate();
 }
 
+// Ahmed Ramadan is the sole workspace admin — identified by his account's
+// email in team_members, not the free-text "role" field. Everyone else can
+// only ever change their own password (see changeMyPassword()).
+const ADMIN_EMAIL='ahmed.ramadan@edecs.com';
+function isAdmin(){
+  const me=teamMembers.find(u=>u.name===currentUser);
+  return !!(me&&me.email&&me.email.trim().toLowerCase()===ADMIN_EMAIL);
+}
+
 function renderTeamList(){
   by('teamMemberList').innerHTML=teamMembers.length
     ?teamMembers.map(u=>'<div class="member-row"><div style="flex:1"><strong>'+esc(u.name)+'</strong><div class="mini">'+esc(u.role||'')+(u.email?' · '+esc(u.email):'')+'</div></div><span class="badge status-new">'+esc(u.role||'Member')+'</span></div>').join('')
     :'<div class="empty">No team members yet.</div>';
+  const admin=isAdmin();
+  by('addMemberWrap').classList.toggle('hidden',!admin);
+  by('addMemberAdminNotice').classList.toggle('hidden',admin);
+}
+
+async function changeMyPassword(){
+  const me=teamMembers.find(u=>u.name===currentUser);
+  if(!me) return toast('Could not find your account record.');
+  const cur=by('myCurrentPass').value, n1=by('myNewPass').value, n2=by('myNewPass2').value;
+  if(!cur||!n1||!n2) return toast('Please fill in all three fields.');
+  if(cur!==me.passcode) return toast('Current password is incorrect.');
+  if(n1!==n2) return toast('New passwords do not match.');
+  if(n1.length<4) return toast('New password should be at least 4 characters.');
+  by('changeMyPassBtn').textContent='Updating...';
+  const {error}=await supabaseClient.from('team_members').update({passcode:n1}).eq('id',me.id);
+  by('changeMyPassBtn').textContent='Update Password';
+  if(error){ toast('Could not update password: '+error.message); return; }
+  me.passcode=n1;
+  by('myCurrentPass').value=''; by('myNewPass').value=''; by('myNewPass2').value='';
+  toast('Your password has been updated.');
 }
 
 function renderLeads(){
@@ -1968,6 +2027,7 @@ function renderCustomSuppliers(){
 }
 
 async function addMember(){
+  if(!isAdmin()) return toast('Only the workspace admin can add team members.');
   const name=by('newMemberName').value.trim(), email=by('newMemberEmail').value.trim(), role=by('newMemberRole').value.trim(), passcode=by('newMemberPass').value.trim();
   if(!name||!passcode) return toast('Name and password are required.');
   by('addMemberBtn').textContent='Saving...';
