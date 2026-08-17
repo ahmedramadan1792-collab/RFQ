@@ -2412,8 +2412,12 @@ function exportCSV(name,rows){ if(rows.length<=1) return toast('No data to expor
 // ---------------------------------------------------------
 // AI ASSISTANT ENGINE
 // ---------------------------------------------------------
-const ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages';
-const AI_MODEL = 'claude-sonnet-4-6';
+// This used to call Anthropic's API directly from the browser, which never
+// worked: there was no API key attached, and even with one, browsers block
+// direct calls to Anthropic's API (and baking a key into client-side code
+// would expose it to anyone viewing the page source anyway). Instead this
+// now calls our own "/api/ai" serverless function (see api/ai.js in the
+// repo), which holds the real API key privately on the server side.
 let aiChatHistory = [];
 let lastGeneratedRfqBody = '';
 
@@ -2422,14 +2426,17 @@ async function callAI(systemPrompt, userMessage, maxTokens) {
   const messages = typeof userMessage === 'string'
     ? [{ role: 'user', content: userMessage }]
     : userMessage;
-  const res = await fetch(ANTHROPIC_ENDPOINT, {
+  const res = await fetch('/api/ai', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: AI_MODEL, max_tokens: maxTokens, system: systemPrompt, messages })
+    body: JSON.stringify({ systemPrompt, messages, maxTokens })
   });
-  if (!res.ok) { const e = await res.json(); throw new Error((e.error && e.error.message) || 'API error ' + res.status); }
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.error || ('AI request failed (' + res.status + ')'));
+  }
   const data = await res.json();
-  return data.content[0].text;
+  return data.text;
 }
 
 function showAiResult(elId, text, isError, isSuccess) {
