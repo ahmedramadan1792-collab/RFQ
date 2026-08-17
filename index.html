@@ -52,6 +52,8 @@ button, input, select, textarea { font: inherit; }
 .label { display: block; margin: 0 0 8px; color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
 .input, .select, .textarea { width: 100%; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); padding: 12px 14px; font-weight: 500; outline: none; transition: 0.2s; }
 .textarea { min-height: 80px; resize: vertical; line-height: 1.5; }
+.view-field { width: 100%; border: 1px solid var(--border); border-radius: 8px; background: #f8f9fa; color: var(--text); padding: 12px 14px; font-weight: 500; min-height: 20px; word-break: break-word; }
+.view-field.view-desc { min-height: 80px; white-space: pre-wrap; line-height: 1.5; }
 .input:focus, .select:focus, .textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,115,232,.15); }
 .form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .field { min-width: 0; }
@@ -752,6 +754,17 @@ const DEFAULT_LOGO_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/200
         <div class="span2"><label class="label">Description</label><textarea class="textarea" id="tDesc"></textarea></div>
       </div>
       <div class="actions"><button class="btn" data-close="taskModal">Cancel</button><button class="btn primary" id="saveTaskBtn">Save Task</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- TASK VIEW MODAL (read-only summary — shown to anyone who isn't the task's creator) -->
+<div class="modal-overlay" id="taskViewModal">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title">Task Details</span><button class="close" data-close="taskViewModal">×</button></div>
+    <div class="modal-body">
+      <div class="form-row" id="taskViewFields"></div>
+      <div class="actions"><button class="btn" data-close="taskViewModal">Close</button></div>
     </div>
   </div>
 </div>
@@ -1627,12 +1640,35 @@ function exportReminderEml(){
 // ---------------------------------------------------------
 // TASKS
 // ---------------------------------------------------------
+// Only the person who created a task may open the editable form for it.
+// Everyone else (the assignee included) gets viewTask()'s read-only summary.
+function isTaskOwner(t){ return !!(t&&t.createdBy&&t.createdBy===currentUser); }
+
 function openTask(id){
   editingTask=id||null; const t=tasks.find(x=>x.id===id)||{};
   by('tTitle').value=t.title||''; by('tProject').value=t.project||''; by('tAssignee').value=t.assignee||'';
   by('tPriority').value=t.priority||'Medium'; by('tDue').value=t.due||''; by('tScope').value=t.scope||'';
   by('tStatus').value=t.status||'To Do'; by('tDesc').value=t.desc||'';
   by('taskModal').classList.add('open');
+}
+
+function viewTask(id){
+  const t=tasks.find(x=>x.id===id); if(!t) return;
+  by('taskViewFields').innerHTML =
+    '<div class="span2"><label class="label">Task Title</label><div class="view-field">'+esc(t.title)+'</div></div>'+
+    '<div><label class="label">Project</label><div class="view-field">'+esc(t.project||'-')+'</div></div>'+
+    '<div><label class="label">Assignee</label><div class="view-field">'+esc(t.assignee||'-')+'</div></div>'+
+    '<div><label class="label">Priority</label><div class="view-field">'+esc(t.priority||'-')+'</div></div>'+
+    '<div><label class="label">Due Date</label><div class="view-field">'+esc(t.due||'No due date')+'</div></div>'+
+    '<div><label class="label">Scope</label><div class="view-field">'+esc(t.scope||'-')+'</div></div>'+
+    '<div><label class="label">Status</label><div class="view-field">'+esc(t.status||'-')+'</div></div>'+
+    '<div class="span2"><label class="label">Description</label><div class="view-field view-desc">'+esc(t.desc||'No description provided.')+'</div></div>';
+  by('taskViewModal').classList.add('open');
+}
+
+function openTaskSmart(id){
+  const t=tasks.find(x=>x.id===id);
+  if(isTaskOwner(t)) openTask(id); else viewTask(id);
 }
 
 async function saveTask(){
@@ -1667,16 +1703,15 @@ function renderTasks(){
     return '<div class="task-col"><div class="task-head"><span>'+s+'</span><span>'+col.length+'</span></div>'+(col.map(t=>{
       // Only the person who originally created/assigned the task can delete it —
       // deleting is a management action, not something an assignee should be able to do.
-      const canDelete = !!(t.createdBy && t.createdBy===currentUser);
+      const canDelete = isTaskOwner(t);
       return '<div class="task-card '+(String(t.priority).toLowerCase())+'" data-open-task="'+t.id+'"><div class="task-title">'+esc(t.title)+'</div><div class="meta">'+esc(t.project||'-')+'<br>'+esc(t.assignee||'-')+' · '+esc(t.due||'No due date')+'</div><div class="toolbar" style="margin:8px 0 0">'+TASK_STATUSES.filter(x=>x!==s).map(x=>'<button class="btn sm" data-move-task="'+t.id+'" data-status="'+x+'">'+x+'</button>').join('')+(canDelete?'<button class="btn sm danger" data-delete-task="'+t.id+'">Del</button>':'')+'</div></div>';
     }).join('')||'<div class="empty">No tasks</div>')+'</div>';
   }).join('');
   // Clicking anywhere on the card (but not its buttons) opens the full task —
-  // this is what lets an assignee read the full description, not just the
-  // truncated preview shown on the board.
+  // the creator gets the editable form, everyone else gets a read-only summary.
   by('taskBoard').querySelectorAll('[data-open-task]').forEach(card=>card.onclick=(e)=>{
     if(e.target.closest('button')) return;
-    openTask(Number(card.dataset.openTask));
+    openTaskSmart(Number(card.dataset.openTask));
   });
   by('taskBoard').querySelectorAll('[data-move-task]').forEach(b=>b.onclick=async (e)=>{
     e.stopPropagation();
@@ -1781,11 +1816,12 @@ function renderNotifications(){
     rows.push('<div class="notif-item" data-open-tender="'+t.id+'"><div><div class="notif-item-title">'+esc(t.name)+'</div><div class="notif-item-meta">Tender deadline · '+esc(t.deadline)+'</div></div><span class="days '+(i.type==='overdue'?'bad':'warn')+'">'+label+'</span></div>');
   });
   by('notifList').innerHTML = rows.length ? rows.join('') : '<div class="empty" style="padding:24px 16px">You\'re all caught up — no notifications.</div>';
-  // Clicking a notification jumps straight to that item's full details.
+  // Clicking a notification jumps straight to that item's full details
+  // (editable for the creator, read-only summary for everyone else).
   by('notifList').querySelectorAll('[data-open-task]').forEach(row=>row.onclick=()=>{
     by('notifPanel').classList.add('hidden');
     showView('tasks');
-    openTask(Number(row.dataset.openTask));
+    openTaskSmart(Number(row.dataset.openTask));
   });
   by('notifList').querySelectorAll('[data-open-tender]').forEach(row=>row.onclick=()=>{
     by('notifPanel').classList.add('hidden');
