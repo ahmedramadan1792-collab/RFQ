@@ -272,7 +272,7 @@ tr:hover td { background: #f8f9fa; }
 .ai-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .ai-tab-panel { display: none; flex-direction: column; gap: 12px; }
 .ai-tab-panel.active { display: flex; }
-.ai-result { background: #f8f9fa; border: 1px solid var(--border); border-radius: 8px; padding: 14px; font-size: 13px; line-height: 1.65; color: var(--dark); white-space: pre-wrap; min-height: 60px; max-height: 260px; overflow-y: auto; }
+.ai-result { background: #f8f9fa; border: 1px solid var(--border); border-radius: 8px; padding: 14px; font-size: 13px; line-height: 1.65; color: var(--dark); min-height: 60px; max-height: 260px; overflow-y: auto; }
 .ai-result.loading { color: var(--muted); font-style: italic; animation: ai-pulse 1.5s ease-in-out infinite; }
 @keyframes ai-pulse { 0%,100%{opacity:.5} 50%{opacity:1} }
 .ai-result.error { background: #fce8e6; color: var(--danger); border-color: #fad2cf; }
@@ -280,8 +280,13 @@ tr:hover td { background: #f8f9fa; }
 .ai-chat-messages { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
 .ai-msg { padding: 10px 12px; border-radius: 8px; font-size: 13px; line-height: 1.6; max-width: 95%; }
 .ai-msg.user { background: #e8f0fe; color: var(--accent-text); align-self: flex-end; border-radius: 8px 8px 2px 8px; }
-.ai-msg.ai { background: #f8f9fa; color: var(--dark); border: 1px solid var(--border); align-self: flex-start; border-radius: 8px 8px 8px 2px; white-space: pre-wrap; }
+.ai-msg.ai { background: #f8f9fa; color: var(--dark); border: 1px solid var(--border); align-self: flex-start; border-radius: 8px 8px 8px 2px; }
 .ai-chat-input-row { display: flex; gap: 8px; align-items: flex-end; }
+.ai-result ul, .ai-msg ul { margin: 4px 0 8px 18px; padding: 0; }
+.ai-result li, .ai-msg li { margin-bottom: 4px; }
+.ai-result p, .ai-msg p { margin: 0 0 8px; }
+.ai-result p:last-child, .ai-msg p:last-child, .ai-result li:last-child, .ai-msg ul:last-child { margin-bottom: 0; }
+.ai-result strong, .ai-msg strong { font-weight: 700; }
 .ai-chat-input { flex: 1; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 13px; resize: none; min-height: 40px; max-height: 120px; outline: none; transition: .2s; }
 .ai-chat-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,115,232,.12); }
 .ai-send-btn { border: 0; background: var(--primary); color: #fff; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-weight: 600; font-size: 13px; transition: .2s; flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
@@ -929,7 +934,7 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
     <!-- CHAT TAB -->
     <div class="ai-tab-panel active" id="aitab-chat">
       <div class="ai-chat-messages" id="aiChatMessages">
-        <div class="ai-msg ai">Hello! I'm your AI procurement assistant. I can help you analyze RFQ data, draft emails, evaluate vendor quotes, identify risks, and answer questions about your projects. What do you need?</div>
+        <div class="ai-msg ai">Hello! I'm your AI procurement assistant. I can help you analyze RFQ data, draft emails, evaluate vendor quotes, identify risks, track your tasks, and answer questions about your projects. What do you need?</div>
       </div>
       <div class="ai-chat-input-row">
         <textarea class="ai-chat-input" id="aiChatInput" placeholder="Ask anything about your tenders, vendors, or quotes…" rows="2"></textarea>
@@ -2444,13 +2449,42 @@ async function callAI(systemPrompt, userMessage, maxTokens) {
     throw new Error(e.error || ('AI request failed (' + res.status + ')'));
   }
   const data = await res.json();
+  // The backend can return a 200 with an empty reply plus an explanation
+  // (e.g. blocked by safety filters, or ran out of its token budget on
+  // internal reasoning) — without this check that silently showed up as a
+  // blank AI message instead of a clear error.
+  if (!data.text) throw new Error(data.error || 'AI returned an empty response.');
   return data.text;
+}
+
+// Renders AI replies as light HTML instead of raw markdown text, so
+// "**bold**" and "- bullet" lines the system prompts explicitly ask the
+// model to use actually show up as real bold text and bullet lists instead
+// of literal asterisks and dashes. Escapes first (via the app's existing
+// esc()) so this is safe even though the content is AI-generated.
+function formatAiText(raw) {
+  const lines = esc(String(raw == null ? '' : raw))
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .split('\n');
+  let html = '', inList = false;
+  lines.forEach(line => {
+    const bullet = line.match(/^\s*[-*•]\s+(.*)/);
+    if (bullet) {
+      if (!inList) { html += '<ul>'; inList = true; }
+      html += '<li>' + bullet[1] + '</li>';
+    } else {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += line.trim() ? '<p>' + line + '</p>' : '';
+    }
+  });
+  if (inList) html += '</ul>';
+  return html;
 }
 
 function showAiResult(elId, text, isError, isSuccess) {
   const el = by(elId);
   el.style.display = 'block';
-  el.textContent = text;
+  el.innerHTML = formatAiText(text);
   el.className = 'ai-result' + (isError ? ' error' : isSuccess ? ' success' : '');
 }
 
@@ -2521,7 +2555,7 @@ async function sendAiChat() {
   const context = buildProjectContext();
   aiChatHistory.push({ role: 'user', content: text });
 
-  const systemPrompt = `You are an expert procurement and tendering assistant for a construction company. You have access to the following live data from the RFQ Workspace:
+  const systemPrompt = `You are an expert procurement, tendering, and task-management assistant for a construction company. You have access to the following live data from the RFQ Workspace, including tenders, RFQs, quotes, and the team's task board:
 
 ${context}
 
@@ -2533,7 +2567,7 @@ Answer questions concisely and professionally. Use bullet points for lists. Be s
     aiChatHistory.push({ role: 'assistant', content: reply });
     // Remove the "…" placeholder and add real reply
     const msgs = by('aiChatMessages').querySelectorAll('.ai-msg.ai');
-    msgs[msgs.length - 1].textContent = reply;
+    msgs[msgs.length - 1].innerHTML = formatAiText(reply);
   } catch (e) {
     const msgs = by('aiChatMessages').querySelectorAll('.ai-msg.ai');
     msgs[msgs.length - 1].textContent = 'Error: ' + e.message;
@@ -2562,6 +2596,16 @@ function buildProjectContext() {
   const currentTender = tenders.find(x => String(x.id) === rfqTenderId);
   const currentDiscipline = by('rfqDiscipline') ? by('rfqDiscipline').value : '';
   const pkgs = by('rfqPackage1') ? [by('rfqPackage1').value, by('rfqPackage2').value].filter(Boolean) : [];
+
+  // Task Manager summary — the assistant previously had zero visibility
+  // into tasks at all, so questions like "what should I focus on" couldn't
+  // be answered with anything real.
+  const openTasks = tasks.filter(t => t.status !== 'Done');
+  const overdueTasks = openTasks.filter(t => t.due && new Date(t.due) < today);
+  const dueSoonTasks = openTasks.filter(t => { if (!t.due) return false; const d = Math.ceil((new Date(t.due)-today)/86400000); return d>=0 && d<=7; });
+  const myOpenTasks = openTasks.filter(t => t.assignee === currentUser);
+  const tasksByStatus = TASK_STATUSES.map(s => s+': '+tasks.filter(t=>t.status===s).length).join(', ');
+
   return `WORKSPACE SUMMARY:
 - Total tenders: ${tenders.length} (${activeT.length} active)
 - RFQ logs issued: ${logs.length}
@@ -2570,9 +2614,15 @@ function buildProjectContext() {
 - Overdue tenders: ${overdueT.map(t=>t.name).join(', ') || 'None'}
 - Total quotes logged: ${quotes.length}
 - Team members: ${teamMembers.map(u=>u.name+' ('+u.role+')').join(', ')}
+- Current user asking: ${currentUser || 'Unknown'}
 
 ACTIVE TENDERS:
 ${activeT.map(t=>`- ${t.name} | Client: ${t.client||'N/A'} | Deadline: ${t.deadline||'N/A'} | Status: ${t.status}`).join('\n') || 'None'}
+
+TASKS (${tasks.length} total — ${tasksByStatus}):
+- Overdue tasks: ${overdueTasks.map(t=>t.title+' (assignee: '+(t.assignee||'unassigned')+', due '+t.due+')').join('; ') || 'None'}
+- Due within 7 days: ${dueSoonTasks.map(t=>t.title+' (assignee: '+(t.assignee||'unassigned')+', due '+t.due+')').join('; ') || 'None'}
+- Open tasks assigned to ${currentUser || 'current user'}: ${myOpenTasks.map(t=>t.title+' ('+t.status+', priority '+t.priority+')').join('; ') || 'None'}
 
 CURRENT RFQ CONFIGURATION:
 - Project: ${currentTender ? currentTender.name + ' (Client: ' + (currentTender.client||'N/A') + ', Location: ' + (currentTender.location||'N/A') + ')' : 'Not selected'}
