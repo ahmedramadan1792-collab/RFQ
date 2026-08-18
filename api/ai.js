@@ -1,34 +1,48 @@
 
-const GEMINI_MODEL_PRIMARY = 'gemini-flash-latest';
-const GEMINI_MODEL_FALLBACK = 'gemini-2.5-flash-lite';
-function geminiEndpoint(model) { return 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent'; }
 
-const MIN_TOKENS_FLOOR = 1500;
+const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+
+
+const FREE_MODEL_CANDIDATES = [
+  process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3.5-lightning:free',
+  'dots-studio/dots-3-note-preview:free',
+  'poolside/laguna-s-2.1:free'
+].filter(Boolean);
+
+const MIN_TOKENS_FLOOR = 800;
 const MAX_TOKENS_CAP = 4096;
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 
 const RETRY_DELAYS_MS = [500, 1200];
+const RETRYABLE_STATUSES = [429, 502, 503, 504];
 
-async function callGeminiWithRetry(url, requestBody) {
-  let geminiRes, data;
+async function callOpenRouterWithRetry(model, requestBody, apiKey) {
+  let res, data;
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
-    geminiRes = await fetch(url, {
+    res = await fetch(OPENROUTER_ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody)
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + apiKey,
+        // Optional attribution headers OpenRouter uses for its public
+        // rankings — not required for the request to work.
+        'HTTP-Referer': process.env.ALLOWED_ORIGIN || 'https://smarter-rfq-pro.vercel.app',
+        'X-Title': 'RFQ Smarter'
+      },
+      body: JSON.stringify(Object.assign({}, requestBody, { model }))
     });
-    data = await geminiRes.json();
+    data = await res.json().catch(() => ({}));
 
-    const isRetryable = geminiRes.status === 503 || geminiRes.status === 429;
+    const isRetryable = RETRYABLE_STATUSES.indexOf(res.status) !== -1;
     const isLastAttempt = attempt === RETRY_DELAYS_MS.length;
-    if (geminiRes.ok || !isRetryable || isLastAttempt) {
-      return { res: geminiRes, data };
+    if (res.ok || !isRetryable || isLastAttempt) {
+      return { res, data };
     }
     await sleep(RETRY_DELAYS_MS[attempt]);
   }
-  return { res: geminiRes, data };
+  return { res, data };
 }
 
 module.exports = async function handler(req, res) {
@@ -46,10 +60,10 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     return res.status(500).json({
-      error: 'Server is missing the GEMINI_API_KEY environment variable. Add it in Vercel Project Settings -> Environment Variables, then redeploy.'
+      error: 'Server is missing the OPENROUTER_API_KEY environment variable. Add it in Vercel Project Settings -> Environment Variables, then redeploy.'
     });
   }
 
@@ -70,45 +84,55 @@ module.exports = async function handler(req, res) {
     : messages;
 
 
-  const contents = normalizedMessages.map(m => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: String(m.content == null ? '' : m.content) }]
-  }));
+  const chatMessages = [];
+  if (systemPrompt) {
+    chatMessages.push({ role: 'system', content: String(systemPrompt) });
+  }
+  normalizedMessages.forEach(m => {
+    chatMessages.push({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: String(m.content == null ? '' : m.content)
+    });
+  });
 
   const cappedMaxTokens = Math.min(Math.max(Number(maxTokens) || 1000, MIN_TOKENS_FLOOR), MAX_TOKENS_CAP);
 
   const requestBody = {
-    contents,
-    generationConfig: { maxOutputTokens: cappedMaxTokens }
+    messages: chatMessages,
+    max_tokens: cappedMaxTokens
   };
-  if (systemPrompt) {
-    requestBody.systemInstruction = { parts: [{ text: systemPrompt }] };
-  }
 
   try {
-    let { res: geminiRes, data } = await callGeminiWithRetry(geminiEndpoint(GEMINI_MODEL_PRIMARY) + '?key=' + encodeURIComponent(apiKey), requestBody);
+    let result;
+    let lastMessage = 'OpenRouter API error.';
 
+    for (let i = 0; i < FREE_MODEL_CANDIDATES.length; i++) {
+      const model = FREE_MODEL_CANDIDATES[i];
+      result = await callOpenRouterWithRetry(model, requestBody, apiKey);
 
-    if (!geminiRes.ok && (geminiRes.status === 503 || geminiRes.status === 429)) {
-      ({ res: geminiRes, data } = await callGeminiWithRetry(geminiEndpoint(GEMINI_MODEL_FALLBACK) + '?key=' + encodeURIComponent(apiKey), requestBody));
+      if (result.res.ok) break;
+
+      const isRetryable = RETRYABLE_STATUSES.indexOf(result.res.status) !== -1;
+      lastMessage = (result.data && result.data.error && result.data.error.message) || ('OpenRouter API error (' + result.res.status + ') for model ' + model);
+      const isLastModel = i === FREE_MODEL_CANDIDATES.length - 1;
+
+      if (!isRetryable || isLastModel) break;
     }
 
-    if (!geminiRes.ok) {
-      const message = (data && data.error && data.error.message) || ('Gemini API error (' + geminiRes.status + ')');
-      return res.status(geminiRes.status).json({ error: message });
+    if (!result.res.ok) {
+      return res.status(result.res.status).json({ error: lastMessage });
     }
 
-    const candidate = data.candidates && data.candidates[0];
-    const text = (candidate && candidate.content && candidate.content.parts && candidate.content.parts[0] && candidate.content.parts[0].text) || '';
+    const choice = result.data.choices && result.data.choices[0];
+    const text = (choice && choice.message && choice.message.content) || '';
 
-    if (!text && candidate && candidate.finishReason && candidate.finishReason !== 'STOP') {
+    if (!text && choice && choice.finish_reason && choice.finish_reason !== 'stop') {
       const reasons = {
-        MAX_TOKENS: 'The reply used up its whole token budget on internal reasoning before writing an answer. This request should have had enough headroom (' + cappedMaxTokens + ' tokens) — if this keeps happening, the conversation or system prompt may just be too long; try a shorter question.',
-        SAFETY: 'The response was blocked by Gemini\'s safety filters.',
-        RECITATION: 'The response was blocked because it matched existing content too closely.'
+        length: 'The reply hit its token limit before finishing. Try a shorter question, or this can be raised in api/ai.js.',
+        content_filter: 'The response was blocked by the model\'s content filter.'
       };
-      const explanation = reasons[candidate.finishReason] || ('finishReason: ' + candidate.finishReason);
-      return res.status(200).json({ text: '', error: 'Gemini returned no text. ' + explanation });
+      const explanation = reasons[choice.finish_reason] || ('finish_reason: ' + choice.finish_reason);
+      return res.status(200).json({ text: '', error: 'The AI returned no text. ' + explanation });
     }
 
     return res.status(200).json({ text });
