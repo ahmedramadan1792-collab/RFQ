@@ -1,0 +1,92 @@
+# Sanity-checks this app before it goes live, on every push/PR to main.
+#
+# This repo isn't a typical npm project (no package.json, no build step, no
+# test suite) — it's a single index.html plus one Vercel serverless
+# function (api/ai.js). GitHub's default "Node.js CI" template (npm ci,
+# npm run build, npm test) doesn't apply here and would just fail on every
+# push. This workflow instead runs the checks that actually matter for
+# this project, using only Node.js itself (already preinstalled on GitHub's
+# runners — no npm install needed at all):
+#
+#   1. api/ai.js has valid JavaScript syntax (catches typos before Vercel
+#      tries to deploy a broken serverless function).
+#   2. The big inline <script> block in index.html has valid JavaScript
+#      syntax (catches typos in the app itself before they go live).
+#   3. index.html's HTML tags are balanced (a common symptom of a bad
+#      manual edit — an extra or missing </div> etc. — that would otherwise
+#      only show up as a broken layout in the browser).
+#   4. No real-looking API key has been accidentally hardcoded into
+#      index.html or api/ai.js (API keys belong in Vercel's Environment
+#      Variables, never committed to the repo).
+#
+# None of this touches your live site — it only reports pass/fail as a
+# check mark on the commit/PR. Vercel's own deployment is separate and
+# runs regardless of what this workflow says.
+name: Verify App Files
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Check api/ai.js syntax
+        run: node --check api/ai.js
+
+      - name: Check index.html's inline JavaScript syntax
+        run: |
+          node -e "
+            const fs = require('fs');
+            const html = fs.readFileSync('index.html', 'utf8');
+            const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]);
+            if (!scripts.length) { console.error('No inline <script> blocks found in index.html'); process.exit(1); }
+            const main = scripts.reduce((a, b) => a.length >= b.length ? a : b, '');
+            fs.writeFileSync('main-script.js', main);
+            console.log('Extracted main script:', main.length, 'characters');
+          "
+          node --check main-script.js
+
+      - name: Check index.html tags are balanced
+        run: |
+          node -e "
+            const fs = require('fs');
+            const html = fs.readFileSync('index.html', 'utf8');
+            let failed = false;
+            ['div','section','button'].forEach(tag => {
+              const open = (html.match(new RegExp('<' + tag + '[ >]', 'g')) || []).length;
+              const close = (html.match(new RegExp('</' + tag + '>', 'g')) || []).length;
+              console.log(tag + ': open=' + open + ' close=' + close);
+              if (open !== close) failed = true;
+            });
+            if (failed) { console.error('Tag mismatch detected — index.html likely has a broken edit (missing or extra closing tag).'); process.exit(1); }
+            console.log('Tags balanced.');
+          "
+
+      - name: Check for accidentally hardcoded API keys
+        run: |
+          FOUND=0
+          if grep -RqE "AIzaSy[A-Za-z0-9_-]{33}" index.html api/*.js 2>/dev/null; then
+            echo "::error::Found what looks like a real Google/Gemini API key hardcoded in the code. Remove it and set it as a Vercel environment variable instead."
+            FOUND=1
+          fi
+          if grep -RqE "sk-or-v1-[A-Za-z0-9]{20,}" index.html api/*.js 2>/dev/null; then
+            echo "::error::Found what looks like a real OpenRouter API key hardcoded in the code. Remove it and set it as a Vercel environment variable instead."
+            FOUND=1
+          fi
+          if grep -RqE "sk-ant-[A-Za-z0-9_-]{20,}" index.html api/*.js 2>/dev/null; then
+            echo "::error::Found what looks like a real Anthropic API key hardcoded in the code. Remove it and set it as a Vercel environment variable instead."
+            FOUND=1
+          fi
+          if [ "$FOUND" -eq 1 ]; then exit 1; fi
+          echo "No obvious hardcoded API keys found."
