@@ -14,6 +14,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Montserrat:wght@700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@5/lib/msal-browser.min.js"></script>
 <style>
 :root {
   /* Google AI Studio Inspired Palette */
@@ -496,7 +497,10 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
             <div class="toolbar" style="justify-content: space-between; margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
               <label class="label" style="margin:0; font-size:13px;">Email Actions</label>
               <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                <button class="btn primary" id="exportEmlBtn" disabled>Export Draft (.eml)</button>
+                <button class="btn primary" id="sendOutlookBtn" disabled>Send via Outlook</button>
+                <button class="btn" id="openRfqOutlookBtn" disabled style="display:none">Open in Outlook</button>
+                <button class="btn" id="exportEmlBtn" disabled>Download Draft (.eml)</button>
+                <button class="btn" id="copyRfqEmailBtn" disabled title="Copy recipients, subject and body to clipboard">Copy Email Text</button>
                 <button class="btn warn" id="createReminderBtn" disabled>
                   <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
                   Outlook Reminder (.ics)
@@ -523,6 +527,7 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
             <option value="pending">Has Pending</option>
             <option value="submitted">All Submitted</option>
           </select>
+          <button class="btn warn" id="remindAllBtn">🔔 Remind All Pending</button>
           <button class="btn accent" id="exportLogsBtn">Export CSV</button>
         </div>
         <div class="table-wrap"><table><thead><tr><th style="width:12%">Date</th><th style="width:19%">Project</th><th style="width:12%">Scope</th><th style="width:19%">Packages</th><th style="width:38%">Vendor Tracking</th></tr></thead><tbody id="logBody"></tbody></table></div>
@@ -596,6 +601,26 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
                 <input class="input" type="password" id="myNewPass2" placeholder="Confirm new password *">
               </div>
               <button class="btn primary" id="changeMyPassBtn" style="margin-top:20px">Update Password</button>
+            </div>
+          </div>
+
+          <!-- Outlook Connection -->
+          <div class="settings-section">
+            <div class="settings-section-head">
+              <div class="settings-section-icon">
+                <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>
+              </div>
+              <div>
+                <div class="settings-section-title">Outlook Connection</div>
+                <div class="settings-section-sub">Connect your own Microsoft 365 / Outlook account so "Send via Outlook" in the RFQ builder can send directly, attachments included — no download step.</div>
+              </div>
+            </div>
+            <div class="settings-section-body">
+              <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+                <div class="subtle" id="outlookConnectionStatus" style="flex:1;min-width:200px">Checking connection…</div>
+                <button class="btn primary" id="connectOutlookBtn" style="display:none">Connect Outlook</button>
+                <button class="btn danger" id="disconnectOutlookBtn" style="display:none">Disconnect</button>
+              </div>
             </div>
           </div>
 
@@ -1001,6 +1026,10 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
       </span>
       <button class="close" data-close="reminderModal">×</button>
     </div>
+    <div id="bulkReminderNav" style="display:none;align-items:center;justify-content:space-between;gap:12px;padding:10px 24px;background:var(--surface);border-bottom:1px solid var(--border);font-size:12px;">
+      <span>Reminder <strong id="bulkReminderCount">1 of 1</strong> — sent or downloaded ones won't be shown again this run.</span>
+      <button class="btn sm" id="bulkReminderNextBtn">Skip to Next Vendor →</button>
+    </div>
     <div class="reminder-modal-body">
       <div class="reminder-tabs">
         <button class="reminder-tab-btn active" data-tab="preview">Preview Output</button>
@@ -1021,13 +1050,18 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
         <textarea class="reminder-textarea" id="reminderBodyEdit"></textarea>
       </div>
     </div>
-    <div style="padding:16px 24px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--border)">
-      <p class="subtle" style="margin:0;flex:1">Export as .eml to seamlessly open in Outlook and send.</p>
-      <div style="display:flex;gap:12px">
+    <div style="padding:16px 24px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--border);flex-wrap:wrap">
+      <p class="subtle" style="margin:0;flex:1;min-width:180px">Opens directly in your default mail app (Outlook, if set as your system default) — no file to download.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
         <button class="btn" data-close="reminderModal">Cancel</button>
-        <button class="btn warn" id="exportReminderEmlBtn">
+        <button class="btn" id="copyReminderEmailBtn" title="Copy recipient, subject and body to clipboard">Copy Email Text</button>
+        <button class="btn" id="exportReminderEmlBtn">
           <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-          Export Draft (.eml)
+          Download Draft (.eml)
+        </button>
+        <button class="btn warn" id="openReminderOutlookBtn">
+          <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+          Open in Outlook
         </button>
       </div>
     </div>
@@ -1118,6 +1152,12 @@ let currentUser = sessionStorage.getItem('rfq_user') || '';
 let editingProject = null, editingTask = null;
 let selectedSuppliers = [], visibleSuppliers = [], selectedFiles = [], rfqEmail = '', rfqSubject = '', deferredInstallPrompt = null;
 let reminderContext = null;
+// Bulk-reminder run state: a queue of {logId, vendorIdx} pairs still to
+// process, and where we are in it. Empty/-1 means "not currently running
+// a bulk reminder session" (a single reminder opened from the 🔔 button
+// on one vendor doesn't touch these).
+let bulkReminderQueue = [];
+let bulkReminderIndex = -1;
 let taskMineOnly = false, pipelineMineOnly = false;
 
 // ---------------------------------------------------------
@@ -1397,6 +1437,7 @@ function launchApp(){
   applyLogos(); populateAllSelects(); renderNav(); showView('dashboard');
   renderNotifications();
   startLiveSync();
+  initMsal(); renderOutlookStatus();
 }
 
 function signOut(){
@@ -1457,7 +1498,12 @@ function bindStaticEvents(){
   by('rfqFiles').onchange=e=>{ selectedFiles=Array.from(e.target.files||[]); renderFiles(); generatePreview(); };
   by('ccLead').onchange=generatePreview;
   by('exportEmlBtn').onclick=exportEml;
-  
+  if (by('sendOutlookBtn')) by('sendOutlookBtn').onclick = sendRfqViaOutlook;
+  if (by('openRfqOutlookBtn')) by('openRfqOutlookBtn').onclick = openRfqInOutlook;
+  if (by('copyRfqEmailBtn')) by('copyRfqEmailBtn').onclick = copyRfqEmailText;
+  if (by('connectOutlookBtn')) by('connectOutlookBtn').onclick = connectOutlook;
+  if (by('disconnectOutlookBtn')) by('disconnectOutlookBtn').onclick = disconnectOutlook;
+
   if (by('createReminderBtn')) {
     by('createReminderBtn').onclick = generateOutlookReminder;
   }
@@ -1491,6 +1537,16 @@ function bindStaticEvents(){
   by('resetReminderTemplateBtn').onclick=resetReminderTemplate;
   by('installAppBtn').onclick=installApp;
   by('exportReminderEmlBtn').onclick=exportReminderEml;
+  if (by('openReminderOutlookBtn')) by('openReminderOutlookBtn').onclick = openReminderInOutlook;
+  if (by('copyReminderEmailBtn')) by('copyReminderEmailBtn').onclick = copyReminderEmailText;
+  if (by('remindAllBtn')) by('remindAllBtn').onclick = remindAllPending;
+  if (by('bulkReminderNextBtn')) by('bulkReminderNextBtn').onclick = advanceBulkReminder;
+  // Cancelling/closing the reminder modal mid bulk-run should stop the run,
+  // not silently leave it half-finished in the background.
+  document.querySelectorAll('[data-close="reminderModal"]').forEach(b=>b.onclick=()=>{
+    by('reminderModal').classList.remove('open');
+    if(bulkReminderIndex>=0) endBulkReminderRun();
+  });
 
   // Logo Events
   const fileInput = by('logoFile'), resetLogoBtn = by('resetLogoBtn');
@@ -1662,6 +1718,127 @@ function renderFiles(){
   by('fileList').querySelectorAll('[data-remove-file]').forEach(b=>b.onclick=()=>{ selectedFiles.splice(Number(b.dataset.removeFile),1); renderFiles(); generatePreview(); });
 }
 
+// ---------------------------------------------------------
+// OUTLOOK / MICROSOFT GRAPH INTEGRATION
+// ---------------------------------------------------------
+// Powers the "Send via Outlook" button: sends the RFQ email (with
+// attachments) straight from this app through the signed-in user's own
+// Microsoft 365 / Outlook.com mailbox — no download step, no popup window
+// to open manually, because the app sends it directly via Microsoft's API
+// instead of asking a desktop app to open a compose window.
+//
+// ONE-TIME SETUP REQUIRED (done once per organization, by whoever manages
+// your Microsoft 365 tenant — not something end users need to do):
+//   1. Go to https://portal.azure.com (or entra.microsoft.com) -> Microsoft
+//      Entra ID -> App registrations -> New registration.
+//        - Name: "RFQ Smarter" (or anything you like).
+//        - Supported account types: "Accounts in this organizational
+//          directory only" if everyone using this app has an Edecs
+//          Microsoft 365 mailbox, or the multi-tenant/personal option if
+//          some users sign in with personal Outlook.com accounts too.
+//        - Redirect URI: platform = "Single-page application (SPA)",
+//          value = this app's exact URL, e.g.
+//          https://smarter-rfq-pro.vercel.app
+//   2. On the app's Overview page, copy the "Application (client) ID" and
+//      paste it into MSAL_CLIENT_ID below, replacing the placeholder.
+//   3. Go to API permissions -> Add a permission -> Microsoft Graph ->
+//      Delegated permissions -> search "Mail.Send" -> Add permissions.
+//      (User.Read is included by default — leave it.) If you're a tenant
+//      admin, click "Grant admin consent for Edecs" so team members
+//      aren't each individually prompted; otherwise every person approves
+//      it themselves the first time they click "Connect Outlook".
+//   4. IMPORTANT: this only works with a genuine Microsoft 365 / Exchange
+//      Online / Outlook.com mailbox. If your company's email is actually
+//      hosted elsewhere (e.g. Google Workspace) and just opened inside the
+//      Outlook desktop app, Microsoft Graph cannot send through it — use
+//      "Download Draft (.eml)" instead in that case.
+// These IDs are not secret (this is a "public client" — there is no
+// backend server involved in the sign-in), so it's fine for them to live
+// here in plain view rather than as a hidden environment variable.
+const MSAL_CLIENT_ID = 'PASTE_YOUR_AZURE_APP_CLIENT_ID_HERE';
+const MSAL_AUTHORITY = 'https://login.microsoftonline.com/common';
+const GRAPH_SCOPES = ['Mail.Send', 'User.Read'];
+// Direct Graph sendMail calls (as opposed to the chunked upload-session API
+// for very large files) top out around a few MB of total request size once
+// attachments are base64-encoded (~33% larger than raw). This keeps a safe
+// margin; above it, fall back to "Download Draft (.eml)" instead.
+const GRAPH_ATTACHMENT_LIMIT_BYTES = 3 * 1024 * 1024;
+
+let msalInstance = null;
+function outlookConfigured(){ return !!(MSAL_CLIENT_ID && MSAL_CLIENT_ID.indexOf('PASTE_') !== 0); }
+function initMsal(){
+  if(!outlookConfigured() || msalInstance || typeof msal === 'undefined') return;
+  msalInstance = new msal.PublicClientApplication({
+    auth: { clientId: MSAL_CLIENT_ID, authority: MSAL_AUTHORITY, redirectUri: window.location.origin },
+    cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: false }
+  });
+}
+function outlookAccount(){
+  if(!msalInstance) return null;
+  const accounts = msalInstance.getAllAccounts();
+  return accounts.length ? accounts[0] : null;
+}
+async function connectOutlook(){
+  if(!outlookConfigured()){ toast('Outlook sending isn\'t set up yet — ask your admin to finish the one-time Azure setup (see the "OUTLOOK / MICROSOFT GRAPH" comment near the top of the app code).'); return null; }
+  initMsal();
+  try {
+    const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES });
+    msalInstance.setActiveAccount(result.account);
+    renderOutlookStatus();
+    toast('Connected to Outlook as ' + result.account.username);
+    return result.account;
+  } catch(e){
+    toast('Outlook connection failed: ' + e.message);
+    return null;
+  }
+}
+async function disconnectOutlook(){
+  const acc = outlookAccount();
+  if(!msalInstance || !acc) return;
+  try {
+    // Full sign-out clears the cached tokens properly. Since the token
+    // cache lives in sessionStorage (cleared automatically when the tab/
+    // browser closes, matching how this app already handles the signed-in
+    // user), a failed/blocked popup here just means you're still
+    // effectively disconnected once the session ends.
+    await msalInstance.logoutPopup({ account: acc, postLogoutRedirectUri: window.location.origin });
+  } catch(e){ /* popup blocked or closed — sessionStorage still bounds exposure */ }
+  renderOutlookStatus();
+  toast('Disconnected from Outlook.');
+}
+async function getGraphToken(){
+  initMsal();
+  let account = outlookAccount();
+  if(!account) account = await connectOutlook();
+  if(!account) return null;
+  try {
+    const result = await msalInstance.acquireTokenSilent({ scopes: GRAPH_SCOPES, account });
+    return result.accessToken;
+  } catch(e){
+    try {
+      const result = await msalInstance.acquireTokenPopup({ scopes: GRAPH_SCOPES, account });
+      return result.accessToken;
+    } catch(e2){
+      toast('Could not get Outlook permission: ' + e2.message);
+      return null;
+    }
+  }
+}
+function renderOutlookStatus(){
+  const el = by('outlookConnectionStatus');
+  if(!el) return;
+  if(!outlookConfigured()){
+    el.textContent = 'Not set up yet — this needs a one-time Azure app registration by your admin. See the "OUTLOOK / MICROSOFT GRAPH" comment near the top of the app\'s code for exact steps.';
+    if(by('connectOutlookBtn')) by('connectOutlookBtn').style.display = 'none';
+    if(by('disconnectOutlookBtn')) by('disconnectOutlookBtn').style.display = 'none';
+    return;
+  }
+  const acc = outlookAccount();
+  if(by('connectOutlookBtn')) by('connectOutlookBtn').style.display = acc ? 'none' : '';
+  if(by('disconnectOutlookBtn')) by('disconnectOutlookBtn').style.display = acc ? '' : 'none';
+  el.textContent = acc ? ('Connected as ' + acc.username) : 'Not connected. Connect your Outlook account so "Send via Outlook" can send RFQs straight from the app.';
+}
+
 function getQuotationDeadline(tender){
   const rfqDl = by('rfqDeadline').value;
   if(rfqDl) return new Date(rfqDl).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
@@ -1676,10 +1853,13 @@ function generatePreview(){
   by('leadName').textContent=leadFor(d);
   
   if(!t||!d||!pkgs.length||!selectedSuppliers.length){ 
-      by('rfqPreview').textContent='System awaiting configuration. Select project, discipline, package, and at least one supplier.'; 
-      by('exportEmlBtn').disabled=true; 
+      by('rfqPreview').textContent='System awaiting configuration. Select project, discipline, package, and at least one supplier.';
+      by('exportEmlBtn').disabled=true;
+      if(by('sendOutlookBtn')) by('sendOutlookBtn').disabled=true;
+      if(by('openRfqOutlookBtn')){ by('openRfqOutlookBtn').disabled=true; by('openRfqOutlookBtn').style.display='none'; }
+      if(by('copyRfqEmailBtn')) by('copyRfqEmailBtn').disabled=true;
       if(by('createReminderBtn')) by('createReminderBtn').disabled=true;
-      return; 
+      return;
   }
 
   let cc=[]; const lead=leadFor(d);
@@ -1704,6 +1884,16 @@ function generatePreview(){
 
   by('rfqPreview').textContent='To: (blank; vendors in Bcc)\nCc: '+(cc.join('; ')||'None')+'\nBcc: '+bcc+'\nSubject: '+rfqSubject+'\n\n'+rfqEmail;
   by('exportEmlBtn').disabled=false;
+  if(by('sendOutlookBtn')) by('sendOutlookBtn').disabled=false;
+  if(by('copyRfqEmailBtn')) by('copyRfqEmailBtn').disabled=false;
+  // "Open in Outlook" (mailto:) only works cleanly when there's nothing to
+  // attach — with files selected, use "Send via Outlook" (if connected) or
+  // "Download Draft (.eml)" instead, both of which carry attachments.
+  if(by('openRfqOutlookBtn')){
+    const noAttachments = selectedFiles.length===0;
+    by('openRfqOutlookBtn').style.display = noAttachments ? '' : 'none';
+    by('openRfqOutlookBtn').disabled = !noAttachments;
+  }
   if(by('createReminderBtn')) by('createReminderBtn').disabled=false;
 }
 
@@ -1746,10 +1936,159 @@ async function exportEml(){
     await supabaseClient.from('rfq_logs').insert([newLog]); 
     logs.push(newLog);
     toast('RFQ generated and archived to registry database with status: ' + chosenStatus);
-    by('exportEmlBtn').textContent='Export Draft (.eml)'; 
+    by('exportEmlBtn').textContent='Export Draft (.eml)';
     renderDashboard(); renderLogs();
   } catch(err) {
     toast('Registry sync error: ' + err.message);
+  }
+}
+
+// Copies text to the clipboard with a resilient fallback for browsers/
+// contexts where the modern Clipboard API is unavailable or blocked.
+async function copyTextToClipboard(text){
+  if(navigator.clipboard && window.isSecureContext){
+    try { await navigator.clipboard.writeText(text); return true; } catch(e){ /* fall through to legacy path */ }
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  } catch(e){ return false; }
+}
+
+// One-click "Open in Outlook" for RFQs that have nothing to attach — a
+// plain mailto: link (with Cc/Bcc) hands off straight to the default mail
+// app, no download step. Only offered when there are no attached files;
+// with files, use "Send via Outlook" (Graph, if connected) or "Download
+// Draft (.eml)" instead, since mailto: cannot carry attachments.
+function openRfqInOutlook(){
+  if(!rfqEmail||!selectedSuppliers.length) return toast('Complete the RFQ setup first.');
+  if(selectedFiles.length) return toast('This RFQ has attachments — use "Send via Outlook" (if connected) or "Download Draft (.eml)" instead.');
+
+  const d=by('rfqDiscipline').value;
+  let cc=[]; const lead=leadFor(d);
+  if(by('ccLead').checked&&lead!=='None'){ const u=teamMembers.find(x=>x.name===lead); if(u&&u.email) cc.push(u.email); }
+  cc=Array.from(new Set(cc));
+  const bccEmails=selectedSuppliers.map(s=>s.emails).join(';').split(/[;,]/).map(e=>e.trim()).filter(Boolean);
+
+  if(!bccEmails.length) return toast('No supplier email addresses found.');
+
+  const params=[];
+  if(cc.length) params.push('cc='+encodeURIComponent(cc.join(',')));
+  params.push('bcc='+encodeURIComponent(bccEmails.join(',')));
+  params.push('subject='+encodeURIComponent(rfqSubject));
+  params.push('body='+encodeURIComponent(rfqEmail));
+  const mailto='mailto:?'+params.join('&');
+
+  // Same truncation safeguard as the reminder version: long recipient
+  // lists or a long email body can silently get cut off past ~1800-2000
+  // characters in some mail clients. Fall back to the always-complete
+  // .eml download instead of risking an incomplete draft.
+  if(mailto.length>1800){
+    toast('Too many recipients or too much text for a direct link — downloading the draft instead so nothing gets cut off.');
+    exportEml();
+    return;
+  }
+
+  window.location.href=mailto;
+  toast('Opening in your default mail app…');
+}
+
+// Copies the fully composed RFQ (recipients, subject, body) as plain text
+// so it can be pasted into an already-open Outlook draft — a safety net
+// for whenever mailto: doesn't behave as expected on someone's machine.
+async function copyRfqEmailText(){
+  if(!rfqEmail||!selectedSuppliers.length) return toast('Complete the RFQ setup first.');
+  const d=by('rfqDiscipline').value;
+  let cc=[]; const lead=leadFor(d);
+  if(by('ccLead').checked&&lead!=='None'){ const u=teamMembers.find(x=>x.name===lead); if(u&&u.email) cc.push(u.email); }
+  cc=Array.from(new Set(cc));
+  const bcc=selectedSuppliers.map(s=>s.emails).join('; ').split(';').map(e=>e.trim()).filter(Boolean).join('; ');
+  const text='To: (blank; vendors in Bcc)\nCc: '+(cc.join('; ')||'None')+'\nBcc: '+bcc+'\nSubject: '+rfqSubject+'\n\n'+rfqEmail;
+  const ok = await copyTextToClipboard(text);
+  toast(ok ? 'Copied — paste into a new Outlook email.' : 'Copy failed — your browser may be blocking clipboard access.');
+}
+
+// Sends the RFQ straight from the app via the connected Outlook account
+// (Microsoft Graph) — no file download, no separate app window to open.
+// See the "OUTLOOK / MICROSOFT GRAPH INTEGRATION" comment block above for
+// the one-time setup this depends on.
+async function sendRfqViaOutlook(){
+  if(!rfqEmail||!selectedSuppliers.length) return toast('Complete the RFQ setup first.');
+  if(!outlookConfigured()) return toast('Outlook sending isn\'t set up yet — ask your admin to finish the one-time Azure setup (see the "OUTLOOK / MICROSOFT GRAPH" comment near the top of the app\'s code), or use "Download Draft (.eml)" instead.');
+
+  const totalBytes = selectedFiles.reduce((n,f)=>n+f.size,0);
+  if(totalBytes > GRAPH_ATTACHMENT_LIMIT_BYTES) return toast('Attachments are too large ('+(totalBytes/1024/1024).toFixed(1)+'MB) to send directly — use "Download Draft (.eml)" instead for large files.');
+
+  const d=by('rfqDiscipline').value;
+  const t=tenders.find(x=>String(x.id)===by('rfqTender').value);
+  const pkgs=[by('rfqPackage1').value,by('rfqPackage2').value].filter(Boolean).join(' + ');
+  const chosenStatus = by('rfqInitialStatus') ? by('rfqInitialStatus').value : 'Pending';
+
+  let cc=[]; const lead=leadFor(d);
+  if(by('ccLead').checked&&lead!=='None'){ const u=teamMembers.find(x=>x.name===lead); if(u&&u.email) cc.push(u.email); }
+  cc=Array.from(new Set(cc));
+  const bccEmails=selectedSuppliers.map(s=>s.emails).join(';').split(/[;,]/).map(e=>e.trim()).filter(Boolean);
+
+  if(!confirm('Send this RFQ now to '+selectedSuppliers.length+' supplier(s) via your connected Outlook account?\n\nThis sends immediately — there\'s no draft to review in Outlook afterward.')) return;
+
+  const token = await getGraphToken();
+  if(!token) return; // getGraphToken already explained why (toast shown)
+
+  const btn = by('sendOutlookBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Sending...'; }
+
+  try {
+    const attachments = [];
+    for(const f of selectedFiles){
+      attachments.push({
+        '@odata.type': '#microsoft.graph.fileAttachment',
+        name: f.name,
+        contentType: f.type || 'application/octet-stream',
+        contentBytes: await readBase64(f)
+      });
+    }
+
+    const message = {
+      subject: rfqSubject,
+      body: { contentType: 'Text', content: rfqEmail },
+      toRecipients: [],
+      ccRecipients: cc.map(e=>({emailAddress:{address:e}})),
+      bccRecipients: bccEmails.map(e=>({emailAddress:{address:e}})),
+      attachments
+    };
+
+    const res = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer '+token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, saveToSentItems: true })
+    });
+
+    if(!res.ok){
+      let msg = 'Microsoft Graph error ('+res.status+')';
+      try { const errBody = await res.json(); msg = (errBody.error && errBody.error.message) || msg; } catch(e){}
+      throw new Error(msg);
+    }
+
+    const deadline=getQuotationDeadline(t);
+    const newLog={
+      id:Date.now(), date:new Date().toLocaleString('en-GB'), rawDate:Date.now(),
+      project:t.name, discipline:d, packages:pkgs,
+      vendors:selectedSuppliers.map(s=>({name:s.name, emails:s.emails, status:chosenStatus})),
+      quotationDeadline: deadline,
+      issuedBy:currentUser
+    };
+    await supabaseClient.from('rfq_logs').insert([newLog]);
+    logs.push(newLog);
+    toast('RFQ sent via Outlook to '+selectedSuppliers.length+' supplier(s) and archived to registry.');
+    renderDashboard(); renderLogs();
+  } catch(err){
+    toast('Send failed: ' + err.message);
+  } finally {
+    if(btn){ btn.disabled=false; btn.textContent='Send via Outlook'; }
   }
 }
 
@@ -1878,6 +2217,7 @@ function openReminderModal(log, vendorIdx){
 
   by('reminderModalTitle').innerHTML=`<svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg> Reminder — ${vendor.name}`;
   by('reminderModal').classList.add('open');
+  updateBulkReminderUI();
 }
 
 function exportReminderEml(){
@@ -1896,8 +2236,115 @@ function exportReminderEml(){
 
   const filename='Reminder_'+subj.replace(/[^a-z0-9]+/gi,'_').slice(0,60)+'.eml';
   download(filename,eml,'message/rfc822');
-  by('reminderModal').classList.remove('open');
   toast('Reminder draft exported successfully.');
+  if(bulkReminderIndex>=0) advanceBulkReminder(); else by('reminderModal').classList.remove('open');
+}
+
+// Genuine one-click open: unlike the main RFQ export, a follow-up reminder
+// has no attachments to worry about, so a plain mailto: link can do the
+// whole job — it hands off straight to whatever mail app is set as the
+// system default (Outlook, if that's your default), with To/Subject/Body
+// already filled in, no download-then-open step at all.
+function openReminderInOutlook(){
+  if(!reminderContext) return;
+  const {log, vendorIdx} = reminderContext;
+  const vendor = log.vendors[vendorIdx];
+  const activeTab = document.querySelector('.reminder-tab-btn.active').dataset.tab;
+  const subj = activeTab==='edit'?by('reminderSubjectEdit').value:by('reminderSubject').textContent;
+  const body = activeTab==='edit'?by('reminderBodyEdit').value:by('reminderBody').textContent;
+  const toList = String(vendor.emails||'').split(/[;,]/).map(e=>e.trim()).filter(Boolean).join(',');
+
+  if(!toList) return toast('This vendor has no email on file — add one before sending a reminder.');
+
+  const mailto = 'mailto:'+toList+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body);
+
+  // mailto: links get silently truncated by some mail clients (desktop
+  // Outlook included) past roughly 1800-2000 combined characters, which
+  // would send a cut-off draft with no warning. Rather than risk that,
+  // fall back automatically to the always-complete .eml download instead.
+  if(mailto.length > 1800){
+    toast('This reminder is a bit long for a direct link — downloading the draft instead so nothing gets cut off.');
+    exportReminderEml();
+    return;
+  }
+
+  window.location.href = mailto;
+  toast('Opening in your default mail app…');
+  if(bulkReminderIndex>=0) advanceBulkReminder(); else by('reminderModal').classList.remove('open');
+}
+
+// Copies the current reminder's recipient, subject and body as plain text
+// so it can be pasted into an already-open Outlook draft — a safety net
+// for whenever mailto: doesn't behave as expected on someone's machine.
+async function copyReminderEmailText(){
+  if(!reminderContext) return;
+  const {log, vendorIdx} = reminderContext;
+  const vendor = log.vendors[vendorIdx];
+  const activeTab = document.querySelector('.reminder-tab-btn.active').dataset.tab;
+  const subj = activeTab==='edit'?by('reminderSubjectEdit').value:by('reminderSubject').textContent;
+  const body = activeTab==='edit'?by('reminderBodyEdit').value:by('reminderBody').textContent;
+  const text = 'To: '+(vendor.emails||'(no email on file)')+'\nSubject: '+subj+'\n\n'+body;
+  const ok = await copyTextToClipboard(text);
+  toast(ok ? 'Copied — paste into a new Outlook email.' : 'Copy failed — your browser may be blocking clipboard access.');
+}
+
+// ---------------------------------------------------------
+// BULK REMINDERS ("Remind All Pending")
+// ---------------------------------------------------------
+// Walks every vendor across every RFQ log that's still Pending or Urgent
+// Follow-up, one at a time, through the same reminder modal used for a
+// single vendor — each send/download/skip advances to the next, so there's
+// no risk of trying to fire off many mailto: links at once (which browsers
+// tend to block after the first).
+function collectPendingReminders(){
+  const list=[];
+  logs.forEach(l=>(l.vendors||[]).forEach((v,i)=>{
+    if(v.status==='Pending'||v.status==='Urgent Follow-up') list.push({logId:l.id, vendorIdx:i});
+  }));
+  return list;
+}
+
+function remindAllPending(){
+  const queue = collectPendingReminders();
+  if(!queue.length) return toast('No pending vendors need a reminder right now.');
+  bulkReminderQueue = queue;
+  bulkReminderIndex = 0;
+  openBulkReminderAt(0);
+}
+
+function openBulkReminderAt(i){
+  const item = bulkReminderQueue[i];
+  const log = item && logs.find(x=>x.id===item.logId);
+  if(!log || !log.vendors[item.vendorIdx]){ advanceBulkReminder(); return; }
+  openReminderModal(log, item.vendorIdx);
+}
+
+function advanceBulkReminder(){
+  bulkReminderIndex++;
+  if(bulkReminderIndex>=bulkReminderQueue.length){
+    bulkReminderQueue=[]; bulkReminderIndex=-1;
+    by('reminderModal').classList.remove('open');
+    toast('All pending reminders processed.');
+    return;
+  }
+  openBulkReminderAt(bulkReminderIndex);
+}
+
+function endBulkReminderRun(){
+  bulkReminderQueue=[]; bulkReminderIndex=-1;
+  updateBulkReminderUI();
+}
+
+function updateBulkReminderUI(){
+  const wrap = by('bulkReminderNav');
+  if(!wrap) return;
+  if(bulkReminderIndex<0 || bulkReminderIndex>=bulkReminderQueue.length){
+    wrap.style.display='none';
+    return;
+  }
+  wrap.style.display='flex';
+  by('bulkReminderCount').textContent=(bulkReminderIndex+1)+' of '+bulkReminderQueue.length;
+  if(by('bulkReminderNextBtn')) by('bulkReminderNextBtn').style.display = (bulkReminderIndex < bulkReminderQueue.length-1) ? '' : 'none';
 }
 
 // ---------------------------------------------------------
