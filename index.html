@@ -523,6 +523,7 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
         <div class="toolbar">
           <input class="input" id="logSearch" placeholder="Search registry…" style="max-width:280px">
           <select class="select" id="logFilterProject" style="max-width:240px"><option value="all">All Projects</option></select>
+          <select class="select" id="logFilterIssuer" style="max-width:200px" title="Filter to RFQs issued by one specific user"><option value="all">All Users</option></select>
           <select class="select" id="logStatus" style="max-width:170px">
             <option value="all">All Statuses</option>
             <option value="pending">Has Pending</option>
@@ -574,7 +575,8 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
         <div class="settings-section" id="onlineUsersPanel" style="margin-bottom:20px;padding:20px 24px"></div>
         <div class="toolbar">
           <button class="btn" id="refreshActivityBtn">Refresh</button>
-          <span class="subtle">Shows the most recent 200 events across projects, tasks and quotes.</span>
+          <select class="select" id="activityFilterUser" style="max-width:220px"><option value="all">All Users</option></select>
+          <span class="subtle">Shows the most recent 200 events across projects, tasks, quotes and settings — pick a user above to see just what they've done.</span>
         </div>
         <div class="activity-feed" id="activityFeed"></div>
       </section>
@@ -1379,7 +1381,33 @@ async function renderActivityLog(){
   try{
     const {data,error} = await supabaseClient.from('activity_log').select('*').order('created_at',{ascending:false}).limit(200);
     if(error){ el.innerHTML='<div class="empty">Could not load activity log'+(error.code==='42P01'?' — run the workflow-upgrade SQL script in Supabase first.':': '+esc(error.message))+'</div>'; return; }
-    if(!data||!data.length){ el.innerHTML='<div class="empty">No activity recorded yet.</div>'; return; }
+    activityLogRows = data||[];
+    populateActivityUserFilter();
+    renderActivityFeed();
+  }catch(e){ el.innerHTML='<div class="empty">Could not load activity log.</div>'; }
+}
+
+// Cached last fetch, so switching the "User" filter re-paints instantly
+// instead of re-hitting Supabase every time — Refresh still does a real
+// re-fetch.
+let activityLogRows = [];
+
+function populateActivityUserFilter(){
+  const sel=by('activityFilterUser'); if(!sel) return;
+  const cur=sel.value||'all';
+  const names=new Set(teamMembers.map(u=>u.name));
+  activityLogRows.forEach(a=>{ if(a.actor) names.add(a.actor); });
+  sel.innerHTML='<option value="all">All Users</option>'+Array.from(names).sort((a,b)=>a.localeCompare(b)).map(n=>'<option>'+esc(n)+'</option>').join('');
+  sel.value=cur;
+}
+
+function renderActivityFeed(){
+  const el=by('activityFeed');
+  if(!isAdmin()) return; // belt-and-suspenders; the view itself is already gated
+  const userFilter=by('activityFilterUser')?by('activityFilterUser').value:'all';
+  const data = userFilter==='all' ? activityLogRows : activityLogRows.filter(a=>a.actor===userFilter);
+  try{
+    if(!data.length){ el.innerHTML='<div class="empty">'+(userFilter==='all'?'No activity recorded yet.':'No activity recorded for '+esc(userFilter)+' yet.')+'</div>'; return; }
     el.innerHTML=data.map(a=>{
       return '<div class="activity-item"><div class="activity-dot"></div><div class="activity-body"><div class="activity-text"><b>'+esc(a.actor||'Someone')+'</b> '+esc(a.details||a.action||'')+'</div><div class="activity-time">'+relTime(a.created_at)+'</div></div></div>';
     }).join('');
@@ -1529,6 +1557,7 @@ function bindStaticEvents(){
   by('logSearch').oninput=renderLogs;
   by('logStatus').onchange=renderLogs;
   by('logFilterProject').onchange=renderLogs;
+  by('logFilterIssuer').onchange=renderLogs;
   by('logArchiveFilter').onchange=renderLogs;
   by('exportLogsBtn').onclick=()=>exportCSV('RFQ_Log.csv',logsToRows());
   by('addTaskBtn').onclick=()=>openTask();
@@ -1537,6 +1566,7 @@ function bindStaticEvents(){
   by('taskMineOnly').onchange=e=>{ taskMineOnly=e.target.checked; renderTasks(); };
   by('pipelineMineOnly').onchange=e=>{ pipelineMineOnly=e.target.checked; renderPipeline(); };
   by('refreshActivityBtn').onclick=renderActivityLog;
+  by('activityFilterUser').onchange=renderActivityFeed;
   by('tCommentPostBtn').onclick=()=>postTaskComment(editingTask, 'tCommentInput', 'tCommentsList');
   by('vCommentPostBtn').onclick=()=>postTaskComment(Number(by('taskViewModal').dataset.taskId), 'vCommentInput', 'vCommentsList');
   by('refreshTrashBtn').onclick=renderTrash;
@@ -1578,6 +1608,7 @@ function bindStaticEvents(){
           settings.prefs.logoSrc = ev.target.result;
           await saveSettingsToCloud();
           applyLogos();
+          logActivity('settings', null, 'updated', currentUser+' changed the workspace logo');
           toast('Workspace logo updated on cloud.');
       };
       reader.readAsDataURL(f); e.target.value = '';
@@ -1587,6 +1618,7 @@ function bindStaticEvents(){
       settings.prefs.logoSrc = DEFAULT_LOGO_SVG;
       await saveSettingsToCloud();
       applyLogos();
+      logActivity('settings', null, 'reset', currentUser+' restored the workspace logo to default');
       toast('App logo restored to default.');
   };
 
@@ -1625,6 +1657,16 @@ function populateAllSelects(){
     logs.forEach(l=>{ if(l.project) names.add(l.project); });
     by('logFilterProject').innerHTML='<option value="all">All Projects</option>'+Array.from(names).sort((a,b)=>a.localeCompare(b)).map(n=>'<option>'+esc(n)+'</option>').join('');
     by('logFilterProject').value=cur;
+  }
+  // "Issued By" filter — every current team member, plus anyone who
+  // issued an RFQ in the past but has since left the team, so their
+  // history doesn't just become unreachable.
+  {
+    const cur=by('logFilterIssuer').value||'all';
+    const issuers=new Set(teamMembers.map(u=>u.name));
+    logs.forEach(l=>{ if(l.issuedBy) issuers.add(l.issuedBy); });
+    by('logFilterIssuer').innerHTML='<option value="all">All Users</option>'+Array.from(issuers).sort((a,b)=>a.localeCompare(b)).map(n=>'<option>'+esc(n)+'</option>').join('');
+    by('logFilterIssuer').value=cur;
   }
   by('rfqDiscipline').innerHTML='<option value="">Select Discipline</option>'+Object.keys(vendorDatabase).map(d=>'<option>'+d+'</option>').join('');
   populateQuotePackageFilter();
@@ -1965,8 +2007,9 @@ async function exportEml(){
   };
 
   try {
-    await supabaseClient.from('rfq_logs').insert([newLog]); 
+    await supabaseClient.from('rfq_logs').insert([newLog]);
     logs.push(newLog);
+    logActivity('rfq', newLog.id, 'issued', currentUser+' issued an RFQ for "'+t.name+'" ('+d+' — '+pkgs+') to '+selectedSuppliers.length+' supplier(s), exported as .eml');
     toast('RFQ generated and archived to registry database with status: ' + chosenStatus);
     by('exportEmlBtn').textContent='Export Draft (.eml)';
     renderDashboard(); renderLogs();
@@ -2115,6 +2158,7 @@ async function sendRfqViaOutlook(){
     };
     await supabaseClient.from('rfq_logs').insert([newLog]);
     logs.push(newLog);
+    logActivity('rfq', newLog.id, 'issued', currentUser+' issued an RFQ for "'+t.name+'" ('+d+' — '+pkgs+') to '+selectedSuppliers.length+' supplier(s), sent via Outlook');
     toast('RFQ sent via Outlook to '+selectedSuppliers.length+' supplier(s) and archived to registry.');
     renderDashboard(); renderLogs();
   } catch(err){
@@ -2181,14 +2225,17 @@ function isLogArchived(l){ return !tenders.some(t=>t.name===l.project); }
 function renderLogs(){
   const q=by('logSearch').value.toLowerCase(), stat=by('logStatus').value;
   const projFilter=by('logFilterProject')?by('logFilterProject').value:'all';
+  const issuerFilter=by('logFilterIssuer')?by('logFilterIssuer').value:'all';
   const archiveMode=by('logArchiveFilter')?by('logArchiveFilter').value:'active';
-  // The registry always shows every user's RFQs — filtering below is only
-  // ever by project / status / archived-state, never by who issued it.
+  // The registry always shows every user's RFQs by default — "Issued By"
+  // is an optional filter on top (e.g. so an admin can pull up exactly
+  // what one specific user has issued), not a restriction to your own.
   let rows=logs.filter(l=>{
     const archived=isLogArchived(l);
     if(archiveMode==='active'&&archived) return false;
     if(archiveMode==='archived'&&!archived) return false;
     if(projFilter!=='all'&&l.project!==projFilter) return false;
+    if(issuerFilter!=='all'&&l.issuedBy!==issuerFilter) return false;
     const hay=[l.project,l.discipline,l.packages,(l.vendors||[]).map(v=>v.name).join(' ')].join(' ').toLowerCase();
     let ok=hay.includes(q);
     if(stat==='pending') ok=ok&&(l.vendors||[]).some(v=>v.status==='Pending');
@@ -2705,6 +2752,7 @@ async function saveQuote(){
   by('saveQuoteBtn').textContent='Saving...';
   const obj={id:Date.now(), vendor, project, scope, package:by('qPackage').value, ref:by('qRef').value.trim(), currency:by('qCurrency').value, totalPrice:total, leadTime:parseInt(by('qLead').value)||0, techScore:Math.max(1,Math.min(10,parseInt(by('qTech').value)||5)), origin:by('qOrigin').value.trim(), notes:by('qNotes').value.trim(), addedBy:currentUser};
   await supabaseClient.from('quotes').insert([obj]); quotes.push(obj);
+  logActivity('quote', obj.id, 'created', currentUser+' added a quotation from "'+vendor+'" for "'+project+'" ('+scope+(obj.package?' — '+obj.package:'')+')');
   by('saveQuoteBtn').textContent='Save Quotation'; by('quoteModal').classList.remove('open'); renderQuotes(); toast('Quotation saved to cloud.');
 }
 function populateQuotePackageFilter(){
@@ -2730,7 +2778,7 @@ function renderQuotes(){
   renderComparison(data, pkgf);
   by('quoteBody').innerHTML=data.length?data.map((q,i)=>'<tr><td class="wrap"><strong style="color:var(--dark)">'+esc(q.vendor)+'</strong><div class="mini">'+esc(q.origin||'')+'</div></td><td class="wrap">'+esc(q.project)+'</td><td>'+esc(q.scope)+'</td><td class="wrap">'+esc(q.package||'-')+'</td><td><strong>'+q.totalPrice.toLocaleString()+' '+esc(q.currency)+'</strong></td><td>'+esc(q.currency)+'</td><td>'+(q.leadTime?q.leadTime+'w':'-')+'</td><td>'+q.techScore+'/10<div class="progress"><span style="width:'+(q.techScore*10)+'%"></span></div></td><td><strong>#'+(i+1)+'</strong><div class="mini">'+q.score+'/100</div></td><td><button class="btn sm danger" data-delete-quote="'+q.id+'">Del</button></td></tr>').join(''):'<tr><td colspan="10" class="empty">No quotations yet.</td></tr>';
   by('quoteBody').querySelectorAll('[data-delete-quote]').forEach(b=>b.onclick=async ()=>{
-    if(confirm('Delete this quotation?')){ const id=Number(b.dataset.deleteQuote); await supabaseClient.from('quotes').delete().eq('id',id); quotes=quotes.filter(q=>q.id!==id); populateQuotePackageFilter(); renderQuotes(); toast('Quote deleted.'); }
+    if(confirm('Delete this quotation?')){ const id=Number(b.dataset.deleteQuote); const q=quotes.find(x=>x.id===id); await supabaseClient.from('quotes').delete().eq('id',id); quotes=quotes.filter(q=>q.id!==id); logActivity('quote', id, 'deleted', currentUser+' deleted the quotation from "'+(q?q.vendor:id)+'"'+(q?' for "'+q.project+'"':'')); populateQuotePackageFilter(); renderQuotes(); toast('Quote deleted.'); }
   });
 }
 
@@ -2880,6 +2928,7 @@ async function changeMyPassword(){
   if(error){ toast('Could not update password: '+error.message); return; }
   me.passcode=n1;
   by('myCurrentPass').value=''; by('myNewPass').value=''; by('myNewPass2').value='';
+  logActivity('user', me.id||null, 'password_changed', currentUser+' changed their own password');
   toast('Your password has been updated.');
 }
 
@@ -2890,7 +2939,9 @@ function renderLeads(){
 async function saveLeads(){
   if(!isAdmin()) return toast('Only the workspace admin can change discipline lead assignments.');
   Object.keys(vendorDatabase).forEach(d=>settings.disciplineLeads[d]=by('lead_'+d).value||'None');
-  await saveSettingsToCloud(); by('leadName').textContent=leadFor(by('rfqDiscipline').value); toast('Lead assignments saved to cloud.');
+  await saveSettingsToCloud();
+  logActivity('settings', null, 'updated', currentUser+' updated discipline lead assignments');
+  by('leadName').textContent=leadFor(by('rfqDiscipline').value); toast('Lead assignments saved to cloud.');
 }
 
 function renderCustomSuppliers(){
@@ -2901,8 +2952,11 @@ function renderCustomSuppliers(){
   by('customSupplierList').innerHTML=cs.length?cs.map((s,i)=>'<div class="vendor-row"><div style="flex:1"><strong>'+esc(s.name)+'</strong><div class="mini">'+esc(s.discipline)+' · '+esc(s.package)+' · '+esc(s.emails)+'</div></div>'+(admin?'<button class="btn sm danger" data-remove-supplier="'+i+'">Remove</button>':'')+'</div>').join(''):'<div class="empty">No custom suppliers yet.</div>';
   by('customSupplierList').querySelectorAll('[data-remove-supplier]').forEach(b=>b.onclick=async ()=>{
     if(!isAdmin()) return toast('Only the workspace admin can remove suppliers.');
+    const removed=settings.customSuppliers[Number(b.dataset.removeSupplier)];
     settings.customSuppliers.splice(Number(b.dataset.removeSupplier),1);
-    await saveSettingsToCloud(); renderCustomSuppliers();
+    await saveSettingsToCloud();
+    if(removed) logActivity('supplier', null, 'deleted', currentUser+' removed supplier "'+removed.name+'" ('+removed.discipline+' — '+removed.package+')');
+    renderCustomSuppliers();
   });
 }
 
@@ -2916,6 +2970,7 @@ async function addMember(){
   if(error){ toast('Failed to add member: '+error.message); }
   else {
     teamMembers.push(newMember);
+    logActivity('team_member', null, 'created', currentUser+' added team member "'+name+'"'+(role?' ('+role+')':''));
     ['newMemberName','newMemberEmail','newMemberRole','newMemberPass'].forEach(id=>by(id).value='');
     populateAllSelects(); renderSettings(); toast('Team member added to cloud database.');
   }
@@ -2928,6 +2983,7 @@ async function addSupplier(){
   by('addSupplierBtn').textContent='Saving...';
   settings.customSuppliers.push({name, discipline, package:pkg, emails});
   await saveSettingsToCloud();
+  logActivity('supplier', null, 'created', currentUser+' added supplier "'+name+'" ('+discipline+' — '+pkg+')');
   ['supplierName','supplierPackage','supplierEmails'].forEach(id=>by(id).value='');
   by('addSupplierBtn').textContent='Add Supplier';
   renderCustomSuppliers(); toast('Supplier added to cloud.');
@@ -2938,13 +2994,17 @@ async function saveRfqTemplate(){
   const val=by('rfqBodyTemplate').value.trim();
   if(!val) return toast('Template cannot be empty.');
   settings.prefs.rfqBodyTemplate=val;
-  await saveSettingsToCloud(); generatePreview(); toast('RFQ email template saved to cloud.');
+  await saveSettingsToCloud();
+  logActivity('settings', null, 'updated', currentUser+' edited the RFQ email template');
+  generatePreview(); toast('RFQ email template saved to cloud.');
 }
 function resetRfqTemplate(){
   if(!isAdmin()) return toast('Only the workspace admin can edit the RFQ email template.');
   by('rfqBodyTemplate').value=DEFAULT_RFQ_BODY;
   settings.prefs.rfqBodyTemplate=DEFAULT_RFQ_BODY;
-  saveSettingsToCloud(); generatePreview(); toast('RFQ template reset to default.');
+  saveSettingsToCloud();
+  logActivity('settings', null, 'reset', currentUser+' reset the RFQ email template to default');
+  generatePreview(); toast('RFQ template reset to default.');
 }
 
 async function saveReminderTemplate(){
@@ -2952,13 +3012,17 @@ async function saveReminderTemplate(){
   const val=by('reminderBodyTemplate').value.trim();
   if(!val) return toast('Template cannot be empty.');
   settings.prefs.reminderBodyTemplate=val;
-  await saveSettingsToCloud(); toast('Reminder email template saved to cloud.');
+  await saveSettingsToCloud();
+  logActivity('settings', null, 'updated', currentUser+' edited the reminder email template');
+  toast('Reminder email template saved to cloud.');
 }
 function resetReminderTemplate(){
   if(!isAdmin()) return toast('Only the workspace admin can edit the reminder email template.');
   by('reminderBodyTemplate').value=DEFAULT_REMINDER_BODY;
   settings.prefs.reminderBodyTemplate=DEFAULT_REMINDER_BODY;
-  saveSettingsToCloud(); toast('Reminder template reset to default.');
+  saveSettingsToCloud();
+  logActivity('settings', null, 'reset', currentUser+' reset the reminder email template to default');
+  toast('Reminder template reset to default.');
 }
 
 // ---------------------------------------------------------
