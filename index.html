@@ -563,8 +563,9 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
         <div class="table-wrap"><table style="min-width:920px;table-layout:auto"><thead><tr><th>Vendor</th><th>Project</th><th>Scope</th><th>Package</th><th>Total Price</th><th>Currency</th><th>Lead Time</th><th>Tech Score</th><th>Rank</th><th>Actions</th></tr></thead><tbody id="quoteBody"></tbody></table></div>
       </section>
 
-      <!-- Activity Log -->
+      <!-- Activity Log (admin only) -->
       <section id="view-activity" class="view">
+        <div class="settings-section" id="onlineUsersPanel" style="margin-bottom:20px;padding:20px 24px"></div>
         <div class="toolbar">
           <button class="btn" id="refreshActivityBtn">Refresh</button>
           <span class="subtle">Shows the most recent 200 events across projects, tasks and quotes.</span>
@@ -604,8 +605,8 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
             </div>
           </div>
 
-          <!-- Outlook Connection -->
-          <div class="settings-section">
+          <!-- Outlook Connection (admin only) -->
+          <div class="settings-section" id="outlookConnectionSection">
             <div class="settings-section-head">
               <div class="settings-section-icon">
                 <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>
@@ -624,8 +625,8 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
             </div>
           </div>
 
-          <!-- ── GROUP: WORKSPACE IDENTITY ── -->
-          <div class="settings-group-header">
+          <!-- ── GROUP: WORKSPACE IDENTITY (admin only) ── -->
+          <div class="settings-group-header" id="workspaceIdentityGroupHeader">
             <div class="settings-group-header-line"></div>
             <span class="settings-group-header-label">Workspace Identity</span>
             <div class="settings-group-header-line"></div>
@@ -657,8 +658,8 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
             </div>
           </div>
 
-          <!-- App & Installation -->
-          <div class="settings-section">
+          <!-- App & Installation (admin only) -->
+          <div class="settings-section" id="appInstallSection">
             <div class="settings-section-head">
               <div class="settings-section-icon">
                 <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
@@ -680,15 +681,15 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
             </div>
           </div>
 
-          <!-- ── GROUP: TEAM & ACCESS ── -->
-          <div class="settings-group-header">
+          <!-- ── GROUP: TEAM & ACCESS (admin only) ── -->
+          <div class="settings-group-header" id="teamAccessGroupHeader">
             <div class="settings-group-header-line"></div>
             <span class="settings-group-header-label">Team &amp; Access</span>
             <div class="settings-group-header-line"></div>
           </div>
 
-          <!-- Team Members -->
-          <div class="settings-section">
+          <!-- Team Members (admin only) -->
+          <div class="settings-section" id="teamMembersSection">
             <div class="settings-section-head">
               <div class="settings-section-icon">
                 <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
@@ -714,8 +715,8 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
             </div>
           </div>
 
-          <!-- Discipline Leads -->
-          <div class="settings-section">
+          <!-- Discipline Leads (admin only) -->
+          <div class="settings-section" id="disciplineLeadsSection">
             <div class="settings-section-head">
               <div class="settings-section-icon">
                 <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
@@ -764,8 +765,8 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
             </div>
           </div>
 
-          <!-- ── GROUP: COMMUNICATION TEMPLATES ── -->
-          <div class="settings-group-header">
+          <!-- ── GROUP: COMMUNICATION TEMPLATES (admin only) ── -->
+          <div class="settings-group-header" id="commTemplatesGroupHeader">
             <div class="settings-group-header-line"></div>
             <span class="settings-group-header-label">Communication Templates</span>
             <div class="settings-group-header-line"></div>
@@ -1159,6 +1160,7 @@ let reminderContext = null;
 let bulkReminderQueue = [];
 let bulkReminderIndex = -1;
 let taskMineOnly = false, pipelineMineOnly = false;
+let presenceChannel = null, onlineUsers = [];
 
 // ---------------------------------------------------------
 // HELPERS
@@ -1365,6 +1367,7 @@ function relTime(iso){
 
 async function renderActivityLog(){
   const el=by('activityFeed');
+  if(!isAdmin()){ el.innerHTML='<div class="empty">Only the workspace admin can view the Activity Log.</div>'; return; }
   el.innerHTML='<div class="empty">Loading...</div>';
   try{
     const {data,error} = await supabaseClient.from('activity_log').select('*').order('created_at',{ascending:false}).limit(200);
@@ -1424,7 +1427,7 @@ async function doSignIn(){
   try {
     if(teamMembers.length===0){ const {data}=await supabaseClient.from('team_members').select('*'); teamMembers=data||[]; }
     const rec = teamMembers.find(u=>(u.email&&u.email.toLowerCase()===userInput)||(u.name&&u.name.toLowerCase()===userInput));
-    if(rec&&rec.passcode===passInput){ currentUser=rec.name; sessionStorage.setItem('rfq_user',currentUser); launchApp(); }
+    if(rec&&rec.passcode===passInput){ currentUser=rec.name; sessionStorage.setItem('rfq_user',currentUser); launchApp(); logActivity('user', rec.id||null, 'signed_in', currentUser+' signed in'); }
     else { err.textContent='Incorrect Email/Name or Password.'; err.style.display='block'; by('signinPass').value=''; by('signinPass').focus(); }
   } catch(e){ err.textContent='Login Error: '+e.message; err.style.display='block'; }
   finally { by('signinBtn').textContent='Sign In'; }
@@ -1437,11 +1440,15 @@ function launchApp(){
   applyLogos(); populateAllSelects(); renderNav(); showView('dashboard');
   renderNotifications();
   startLiveSync();
+  startPresenceTracking();
   initMsal(); renderOutlookStatus();
 }
 
 function signOut(){
   if(!confirm('Are you sure you want to sign out?')) return;
+  const me=teamMembers.find(u=>u.name===currentUser);
+  if(me) logActivity('user', me.id||null, 'signed_out', currentUser+' signed out');
+  stopPresenceTracking();
   currentUser=''; sessionStorage.removeItem('rfq_user');
   by('signinPass').value=''; by('signinUser').value='';
   by('app').classList.add('hidden'); by('signin').classList.remove('hidden');
@@ -1451,11 +1458,15 @@ function signOut(){
 // NAV & BINDINGS
 // ---------------------------------------------------------
 function renderNav(){
-  by('nav').innerHTML = NAV.map(n=>`<button class="tab" data-view="${n[0]}">${n[2]} ${n[1]}</button>`).join('');
+  // Activity Log shows who's online and everyone's activity trail, so it's
+  // admin-only — non-admins don't even see the tab.
+  const admin=isAdmin();
+  by('nav').innerHTML = NAV.filter(n=>n[0]!=='activity'||admin).map(n=>`<button class="tab" data-view="${n[0]}">${n[2]} ${n[1]}</button>`).join('');
   by('nav').querySelectorAll('.tab').forEach(b=>b.onclick=()=>showView(b.dataset.view));
 }
 
 function showView(v){
+  if(v==='activity'&&!isAdmin()){ toast('Only the workspace admin can view the Activity Log.'); v='dashboard'; }
   document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('active',el.dataset.view===v));
   by('view-'+v).classList.add('active');
@@ -1468,7 +1479,7 @@ function showView(v){
   if(v==='registry') renderLogs();
   if(v==='tasks') renderTasks();
   if(v==='quotes') renderQuotes();
-  if(v==='activity') renderActivityLog();
+  if(v==='activity'){ renderOnlineUsers(); renderActivityLog(); }
   if(v==='settings') renderSettings();
 }
 
@@ -1779,6 +1790,7 @@ function outlookAccount(){
   return accounts.length ? accounts[0] : null;
 }
 async function connectOutlook(){
+  if(!isAdmin()){ toast('Only the workspace admin can connect Outlook.'); return null; }
   if(!outlookConfigured()){ toast('Outlook sending isn\'t set up yet — ask your admin to finish the one-time Azure setup (see the "OUTLOOK / MICROSOFT GRAPH" comment near the top of the app code).'); return null; }
   initMsal();
   try {
@@ -1793,6 +1805,7 @@ async function connectOutlook(){
   }
 }
 async function disconnectOutlook(){
+  if(!isAdmin()) return toast('Only the workspace admin can manage the Outlook connection.');
   const acc = outlookAccount();
   if(!msalInstance || !acc) return;
   try {
@@ -2511,10 +2524,52 @@ async function refreshLiveData(){
       if(id==='tasks') renderTasks();
       if(id==='pipeline') renderPipeline();
       if(id==='dashboard') renderDashboard();
-      if(id==='activity') renderActivityLog();
+      if(id==='activity'){ renderOnlineUsers(); renderActivityLog(); }
     }
     renderNotifications();
   }catch(e){ console.error('Live sync refresh failed: '+e.message); }
+}
+
+// ---------------------------------------------------------
+// PRESENCE ("who's online" — admin-only visibility)
+// ---------------------------------------------------------
+// Every signed-in tab joins the same Supabase Realtime presence channel and
+// tracks its own name. Everyone broadcasts their presence (that's what lets
+// it work at all), but only the admin ever sees the resulting list — see
+// renderOnlineUsers, which no-ops for non-admins, and the Activity Log tab
+// (where this is shown) which is itself hidden from non-admins.
+function startPresenceTracking(){
+  if(!supabaseClient||!currentUser||presenceChannel) return;
+  try{
+    presenceChannel = supabaseClient.channel('rfq-presence', { config: { presence: { key: currentUser } } });
+    presenceChannel
+      .on('presence', {event:'sync'}, ()=>{
+        const state = presenceChannel.presenceState();
+        onlineUsers = Object.keys(state).map(name=>({ name, since: (state[name][0]||{}).online_at })).sort((a,b)=>a.name.localeCompare(b.name));
+        renderOnlineUsers();
+      })
+      .subscribe(async (status)=>{
+        if(status==='SUBSCRIBED'){ await presenceChannel.track({online_at:new Date().toISOString()}); }
+      });
+  }catch(e){ console.error('Presence tracking failed: '+e.message); }
+}
+
+function stopPresenceTracking(){
+  if(!presenceChannel) return;
+  try{ presenceChannel.untrack(); supabaseClient.removeChannel(presenceChannel); }catch(e){}
+  presenceChannel = null; onlineUsers = [];
+}
+
+function renderOnlineUsers(){
+  const el=by('onlineUsersPanel');
+  if(!el) return;
+  if(!isAdmin()){ el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  const others = onlineUsers;
+  el.innerHTML = '<div class="settings-section-title" style="margin-bottom:12px">Currently Online ('+others.length+')</div>'
+    + (others.length
+      ? '<div style="display:flex;flex-wrap:wrap;gap:8px">'+others.map(u=>'<span class="badge status-won">🟢 '+esc(u.name)+(u.name===currentUser?' (you)':'')+'</span>').join('')+'</div>'
+      : '<div class="empty">No one is currently online.</div>');
 }
 
 // ---------------------------------------------------------
@@ -2692,12 +2747,23 @@ function renderSettings(){
   renderCustomSuppliers();
   by('rfqBodyTemplate').value = rfqBodyTemplate();
   by('reminderBodyTemplate').value = reminderBodyTemplate();
-  // Email templates and the workspace logo are shared, workspace-wide settings,
-  // so only the admin should see or edit them.
+  // Non-admins get exactly two things on this page: "Change My Password"
+  // (My Account group, always shown) and adding a supplier (Custom
+  // Suppliers, under Procurement Database — see renderCustomSuppliers for
+  // the delete-button gating). Every other section — Outlook Connection,
+  // Brand Identity, App Installation, Team Members, Discipline Leads, both
+  // Communication Templates, and Data Management/Trash — is admin-only.
   const admin=isAdmin();
+  by('outlookConnectionSection').classList.toggle('hidden',!admin);
+  by('workspaceIdentityGroupHeader').classList.toggle('hidden',!admin);
+  by('brandIdentitySection').classList.toggle('hidden',!admin);
+  by('appInstallSection').classList.toggle('hidden',!admin);
+  by('teamAccessGroupHeader').classList.toggle('hidden',!admin);
+  by('teamMembersSection').classList.toggle('hidden',!admin);
+  by('disciplineLeadsSection').classList.toggle('hidden',!admin);
+  by('commTemplatesGroupHeader').classList.toggle('hidden',!admin);
   by('rfqTemplateSection').classList.toggle('hidden',!admin);
   by('reminderTemplateSection').classList.toggle('hidden',!admin);
-  by('brandIdentitySection').classList.toggle('hidden',!admin);
   by('dataMgmtGroupHeader').classList.toggle('hidden',!admin);
   by('trashSection').classList.toggle('hidden',!admin);
   if(admin) renderTrash();
@@ -2781,14 +2847,19 @@ function renderLeads(){
 }
 
 async function saveLeads(){
+  if(!isAdmin()) return toast('Only the workspace admin can change discipline lead assignments.');
   Object.keys(vendorDatabase).forEach(d=>settings.disciplineLeads[d]=by('lead_'+d).value||'None');
   await saveSettingsToCloud(); by('leadName').textContent=leadFor(by('rfqDiscipline').value); toast('Lead assignments saved to cloud.');
 }
 
 function renderCustomSuppliers(){
   const cs=settings.customSuppliers||[];
-  by('customSupplierList').innerHTML=cs.length?cs.map((s,i)=>'<div class="vendor-row"><div style="flex:1"><strong>'+esc(s.name)+'</strong><div class="mini">'+esc(s.discipline)+' · '+esc(s.package)+' · '+esc(s.emails)+'</div></div><button class="btn sm danger" data-remove-supplier="'+i+'">Remove</button></div>').join(''):'<div class="empty">No custom suppliers yet.</div>';
+  const admin=isAdmin();
+  // Anyone can add a supplier; only the admin can remove one, so the
+  // Remove button itself is admin-only (not just the click handler).
+  by('customSupplierList').innerHTML=cs.length?cs.map((s,i)=>'<div class="vendor-row"><div style="flex:1"><strong>'+esc(s.name)+'</strong><div class="mini">'+esc(s.discipline)+' · '+esc(s.package)+' · '+esc(s.emails)+'</div></div>'+(admin?'<button class="btn sm danger" data-remove-supplier="'+i+'">Remove</button>':'')+'</div>').join(''):'<div class="empty">No custom suppliers yet.</div>';
   by('customSupplierList').querySelectorAll('[data-remove-supplier]').forEach(b=>b.onclick=async ()=>{
+    if(!isAdmin()) return toast('Only the workspace admin can remove suppliers.');
     settings.customSuppliers.splice(Number(b.dataset.removeSupplier),1);
     await saveSettingsToCloud(); renderCustomSuppliers();
   });
