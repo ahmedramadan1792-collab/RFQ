@@ -522,10 +522,16 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
       <section id="view-registry" class="view">
         <div class="toolbar">
           <input class="input" id="logSearch" placeholder="Search registry…" style="max-width:280px">
+          <select class="select" id="logFilterProject" style="max-width:240px"><option value="all">All Projects</option></select>
           <select class="select" id="logStatus" style="max-width:170px">
             <option value="all">All Statuses</option>
             <option value="pending">Has Pending</option>
             <option value="submitted">All Submitted</option>
+          </select>
+          <select class="select" id="logArchiveFilter" style="max-width:200px" title="Projects that have been deleted from the Tender Pipeline move to the Archived Registry instead of staying in the active list forever.">
+            <option value="active">Active Registry</option>
+            <option value="archived">Archived Registry (Deleted Projects)</option>
+            <option value="both">All (Active + Archived)</option>
           </select>
           <button class="btn warn" id="remindAllBtn">🔔 Remind All Pending</button>
           <button class="btn accent" id="exportLogsBtn">Export CSV</button>
@@ -1159,6 +1165,7 @@ let reminderContext = null;
 // on one vendor doesn't touch these).
 let bulkReminderQueue = [];
 let bulkReminderIndex = -1;
+let lastFilteredLogs = null; // null = renderLogs() hasn't run yet this session; [] is a valid "0 filtered rows" result
 let taskMineOnly = false, pipelineMineOnly = false;
 let presenceChannel = null, onlineUsers = [];
 
@@ -1521,6 +1528,8 @@ function bindStaticEvents(){
 
   by('logSearch').oninput=renderLogs;
   by('logStatus').onchange=renderLogs;
+  by('logFilterProject').onchange=renderLogs;
+  by('logArchiveFilter').onchange=renderLogs;
   by('exportLogsBtn').onclick=()=>exportCSV('RFQ_Log.csv',logsToRows());
   by('addTaskBtn').onclick=()=>openTask();
   by('saveTaskBtn').onclick=saveTask;
@@ -1607,6 +1616,16 @@ function populateAllSelects(){
     by(id).innerHTML='<option value="all">All Projects</option>'+tenders.map(t=>'<option>'+esc(t.name)+'</option>').join('');
     by(id).value=cur;
   });
+  // Registry's project filter also needs to list projects that only exist
+  // in old RFQ logs (i.e. their project was since deleted) — otherwise
+  // there'd be no way to pick one and view its Archived Registry entries.
+  {
+    const cur=by('logFilterProject').value||'all';
+    const names=new Set(tenders.map(t=>t.name));
+    logs.forEach(l=>{ if(l.project) names.add(l.project); });
+    by('logFilterProject').innerHTML='<option value="all">All Projects</option>'+Array.from(names).sort((a,b)=>a.localeCompare(b)).map(n=>'<option>'+esc(n)+'</option>').join('');
+    by('logFilterProject').value=cur;
+  }
   by('rfqDiscipline').innerHTML='<option value="">Select Discipline</option>'+Object.keys(vendorDatabase).map(d=>'<option>'+d+'</option>').join('');
   populateQuotePackageFilter();
 }
@@ -2153,17 +2172,33 @@ async function generateOutlookReminder() {
 // ---------------------------------------------------------
 // REGISTRY
 // ---------------------------------------------------------
+// A log's project counts as archived once that project is no longer an
+// active (non-deleted) tender — i.e. it was deleted from the Tender
+// Pipeline. This needs no extra data: `tenders` already only holds
+// non-deleted projects, so "name not found there" == archived.
+function isLogArchived(l){ return !tenders.some(t=>t.name===l.project); }
+
 function renderLogs(){
   const q=by('logSearch').value.toLowerCase(), stat=by('logStatus').value;
+  const projFilter=by('logFilterProject')?by('logFilterProject').value:'all';
+  const archiveMode=by('logArchiveFilter')?by('logArchiveFilter').value:'active';
+  // The registry always shows every user's RFQs — filtering below is only
+  // ever by project / status / archived-state, never by who issued it.
   let rows=logs.filter(l=>{
+    const archived=isLogArchived(l);
+    if(archiveMode==='active'&&archived) return false;
+    if(archiveMode==='archived'&&!archived) return false;
+    if(projFilter!=='all'&&l.project!==projFilter) return false;
     const hay=[l.project,l.discipline,l.packages,(l.vendors||[]).map(v=>v.name).join(' ')].join(' ').toLowerCase();
     let ok=hay.includes(q);
     if(stat==='pending') ok=ok&&(l.vendors||[]).some(v=>v.status==='Pending');
     if(stat==='submitted') ok=ok&&(l.vendors||[]).length&&(l.vendors||[]).every(v=>v.status==='Submitted');
     return ok;
   }).sort((a,b)=>b.rawDate-a.rawDate);
+  lastFilteredLogs=rows; // so "Export CSV" exports exactly what's on screen, not always everything
 
   by('logBody').innerHTML=rows.length?rows.map(l=>{
+    const archived=isLogArchived(l);
     const vendorCells=(l.vendors||[]).map((v,i)=>{
       const selectHtml=`<select class="select" style="max-width:130px;font-size:12px;padding:4px 8px;" data-log="${l.id}" data-vendor="${i}">
         <option ${v.status==='Pending'?'selected':''}>Pending</option>
@@ -2176,7 +2211,8 @@ function renderLogs(){
       const reminderBtnHtml=`<button class="remind-btn" data-remind-log="${l.id}" data-remind-vendor="${i}" title="Generate reminder email">🔔 Remind</button>`;
       return `<div class="vendor-row"><div style="flex:1"><strong>${esc(v.name)}</strong><div class="mini">${esc(v.emails||'')}</div></div><div class="vendor-status-wrap">${selectHtml}${reminderBtnHtml}</div></div>`;
     }).join('');
-    return `<tr><td class="wrap">${esc(l.date)}</td><td class="wrap"><strong style="color:var(--dark)">${esc(l.project)}</strong><div class="mini">Issued by ${esc(l.issuedBy||'-')}</div></td><td>${esc(l.discipline)}</td><td class="wrap">${esc(l.packages)}</td><td class="wrap">${vendorCells}</td></tr>`;
+    const archivedBadge=archived?' <span class="badge status-lost" title="Project deleted from the Tender Pipeline">Archived</span>':'';
+    return `<tr><td class="wrap">${esc(l.date)}</td><td class="wrap"><strong style="color:var(--dark)">${esc(l.project)}</strong>${archivedBadge}<div class="mini">Issued by ${esc(l.issuedBy||'-')}</div></td><td>${esc(l.discipline)}</td><td class="wrap">${esc(l.packages)}</td><td class="wrap">${vendorCells}</td></tr>`;
   }).join(''):'<tr><td colspan="5" class="empty">No RFQ logs match your filters.</td></tr>';
 
   // Status change handlers
@@ -2197,7 +2233,12 @@ function renderLogs(){
   });
 }
 
-function logsToRows(){ return [['Date','Project','Discipline','Packages','Vendors','Issued By']].concat(logs.map(l=>[l.date,l.project,l.discipline,l.packages,(l.vendors||[]).map(v=>v.name+' ('+v.status+')').join(' | '),l.issuedBy||''])); }
+function logsToRows(){
+  // Exports exactly what's currently filtered/visible in the Registry
+  // (project, status, active/archived) — not always the entire table.
+  const src=lastFilteredLogs!==null?lastFilteredLogs:logs;
+  return [['Date','Project','Discipline','Packages','Vendors','Issued By','Archived']].concat(src.map(l=>[l.date,l.project,l.discipline,l.packages,(l.vendors||[]).map(v=>v.name+' ('+v.status+')').join(' | '),l.issuedBy||'',isLogArchived(l)?'Yes':'No']));
+}
 
 // ---------------------------------------------------------
 // REMINDER MODAL
