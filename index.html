@@ -113,6 +113,8 @@ main { flex: 1; overflow-y: auto; padding: 32px; background: var(--surface); }
 .notif-item-title { font-weight: 600; font-size: 12.5px; color: var(--dark); }
 .notif-item-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .notif-item > span.days { flex-shrink: 0; }
+.notif-dismiss { flex-shrink: 0; border: none; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; width: 22px; height: 22px; border-radius: 50%; cursor: pointer; padding: 0; transition: 0.15s; }
+.notif-dismiss:hover { background: #e9ecef; color: var(--dark); }
 .pill { background: #f1f3f4; color: var(--dark); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-weight: 600; font-size: 12px; }
 .date { color: var(--muted); font-weight: 500; font-size: 12px; }
 
@@ -2843,6 +2845,22 @@ function seenTaskKey(){ return 'rfq_seen_tasks_'+currentUser; }
 function getSeenTaskIds(){ try{ return JSON.parse(localStorage.getItem(seenTaskKey())||'[]'); }catch(e){ return []; } }
 function markTasksSeen(ids){ try{ localStorage.setItem(seenTaskKey(), JSON.stringify(ids)); }catch(e){} }
 
+// Per-notification dismiss — explicit, user-clicked only. This is
+// deliberately separate from any "seen" logic above: nothing here ever
+// hides an item on its own just because time passed or the panel opened.
+// An item disappears only when the user clicks its own × button, and it
+// stays dismissed for that same item until it changes again (e.g. a task's
+// due date moves, or a new RFQ is issued gets its own fresh key).
+function dismissedNotifKey(){ return 'rfq_dismissed_notifs_'+currentUser; }
+function getDismissedNotifs(){ try{ return new Set(JSON.parse(localStorage.getItem(dismissedNotifKey())||'[]')); }catch(e){ return new Set(); } }
+function dismissNotif(key){
+  try{
+    const cur=getDismissedNotifs();
+    cur.add(key);
+    localStorage.setItem(dismissedNotifKey(), JSON.stringify([...cur]));
+  }catch(e){}
+}
+
 // Team RFQ activity — admin-only. Deliberately NOT a dismissible
 // "unread" list with hidden/seen state: the admin decides what they look
 // at, not an algorithm on their behalf. Every time the bell opens, this
@@ -2857,8 +2875,10 @@ function teamRfqFeed(){ return logs.filter(l=>l.issuedBy&&l.issuedBy!==currentUs
 function computeNotifications(){
   const today=new Date(); today.setHours(0,0,0,0);
   const seen=new Set(getSeenTaskIds());
+  const dismissed=getDismissedNotifs();
   const taskItems=[];
   tasks.filter(t=>t.assignee&&t.assignee===currentUser&&t.status!=='Done').forEach(t=>{
+    if(dismissed.has('task:'+t.id)) return;
     let dayDiff=null;
     if(t.due){ dayDiff=Math.ceil((new Date(t.due)-today)/86400000); }
     const isNew=!seen.has(t.id);
@@ -2868,13 +2888,14 @@ function computeNotifications(){
   });
   const tenderItems=[];
   tenders.filter(t=>t.assignee&&t.assignee===currentUser&&t.deadline&&['New','Under Study','Submitted'].includes(t.status)).forEach(t=>{
+    if(dismissed.has('tender:'+t.id)) return;
     const dayDiff=Math.ceil((new Date(t.deadline)-today)/86400000);
     if(dayDiff<=NOTIF_DUE_SOON_DAYS) tenderItems.push({type:dayDiff<0?'overdue':'due-soon', tender:t, dayDiff});
   });
   taskItems.sort((a,b)=>(a.dayDiff??999)-(b.dayDiff??999));
   tenderItems.sort((a,b)=>a.dayDiff-b.dayDiff);
 
-  const rfqItems = isAdmin() ? teamRfqFeed().map(l=>({type:'rfq', log:l})) : [];
+  const rfqItems = isAdmin() ? teamRfqFeed().filter(l=>!dismissed.has('rfq:'+l.id)).map(l=>({type:'rfq', log:l})) : [];
   return {taskItems, tenderItems, rfqItems};
 }
 
@@ -2891,18 +2912,18 @@ function renderNotifications(){
   // is the thing you're most likely checking the bell for.
   rfqItems.forEach(i=>{
     const l=i.log;
-    rows.push('<div class="notif-item" data-open-rfq="'+l.id+'"><div><div class="notif-item-title">'+esc(l.issuedBy)+' issued an RFQ</div><div class="notif-item-meta">'+esc(l.project||'-')+' · '+esc(l.discipline||'-')+(l.packages?' · '+esc(l.packages):'')+'</div></div><span class="days ok">'+esc(relTime(l.rawDate))+'</span></div>');
+    rows.push('<div class="notif-item" data-open-rfq="'+l.id+'"><div><div class="notif-item-title">'+esc(l.issuedBy)+' issued an RFQ</div><div class="notif-item-meta">'+esc(l.project||'-')+' · '+esc(l.discipline||'-')+(l.packages?' · '+esc(l.packages):'')+'</div></div><span class="days ok">'+esc(relTime(l.rawDate))+'</span><button type="button" class="notif-dismiss" data-dismiss="rfq:'+l.id+'" title="Dismiss">&times;</button></div>');
   });
   taskItems.forEach(i=>{
     const t=i.task;
     const label = i.type==='overdue' ? ('Overdue '+Math.abs(i.dayDiff)+'d') : i.type==='due-soon' ? (i.dayDiff===0?'Due today':'Due in '+i.dayDiff+'d') : 'New';
     const cls = i.type==='overdue'?'bad':i.type==='due-soon'?'warn':'ok';
-    rows.push('<div class="notif-item" data-open-task="'+t.id+'"><div><div class="notif-item-title">'+esc(t.title)+'</div><div class="notif-item-meta">'+esc(t.project||'General task')+(t.due?' · Due '+esc(t.due):' · No due date')+'</div></div><span class="days '+cls+'">'+label+'</span></div>');
+    rows.push('<div class="notif-item" data-open-task="'+t.id+'"><div><div class="notif-item-title">'+esc(t.title)+'</div><div class="notif-item-meta">'+esc(t.project||'General task')+(t.due?' · Due '+esc(t.due):' · No due date')+'</div></div><span class="days '+cls+'">'+label+'</span><button type="button" class="notif-dismiss" data-dismiss="task:'+t.id+'" title="Dismiss">&times;</button></div>');
   });
   tenderItems.forEach(i=>{
     const t=i.tender;
     const label = i.type==='overdue' ? ('Overdue '+Math.abs(i.dayDiff)+'d') : (i.dayDiff===0?'Due today':'Due in '+i.dayDiff+'d');
-    rows.push('<div class="notif-item" data-open-tender="'+t.id+'"><div><div class="notif-item-title">'+esc(t.name)+'</div><div class="notif-item-meta">Tender deadline · '+esc(t.deadline)+'</div></div><span class="days '+(i.type==='overdue'?'bad':'warn')+'">'+label+'</span></div>');
+    rows.push('<div class="notif-item" data-open-tender="'+t.id+'"><div><div class="notif-item-title">'+esc(t.name)+'</div><div class="notif-item-meta">Tender deadline · '+esc(t.deadline)+'</div></div><span class="days '+(i.type==='overdue'?'bad':'warn')+'">'+label+'</span><button type="button" class="notif-dismiss" data-dismiss="tender:'+t.id+'" title="Dismiss">&times;</button></div>');
   });
   by('notifList').innerHTML = rows.length ? rows.join('') : '<div class="empty" style="padding:24px 16px">You\'re all caught up — no notifications.</div>';
   // Clicking a notification jumps straight to that item's full details
@@ -2922,6 +2943,14 @@ function renderNotifications(){
     by('notifPanel').classList.add('hidden');
     showView('pipeline');
     openProject(Number(row.dataset.openTender));
+  });
+  // Dismiss is its own explicit click, never triggered by opening the
+  // panel or by the row's own navigate-on-click — stopPropagation keeps
+  // it from also firing the row handler above.
+  by('notifList').querySelectorAll('[data-dismiss]').forEach(btn=>btn.onclick=(e)=>{
+    e.stopPropagation();
+    dismissNotif(btn.dataset.dismiss);
+    renderNotifications();
   });
 }
 
