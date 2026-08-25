@@ -453,7 +453,7 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
       <!-- Pipeline -->
       <section id="view-pipeline" class="view">
         <div class="toolbar"><h2 class="section-title">Tender Pipeline</h2><button class="btn primary" id="addProjectBtn">+ Add New Project</button><label class="btn sm" style="cursor:pointer;user-select:none"><input type="checkbox" id="pipelineMineOnly" style="margin-right:6px;vertical-align:middle">My Items Only</label></div>
-        <div class="table-wrap"><table><thead><tr><th style="width:25%">Project</th><th style="width:13%">Client</th><th style="width:14%">Assignee</th><th style="width:16%">Location</th><th style="width:10%">Status</th><th style="width:10%">Deadline</th><th style="width:12%">Actions</th></tr></thead><tbody id="pipelineBody"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th style="width:22%">Project</th><th style="width:11%">Client</th><th style="width:12%">Assignee</th><th style="width:14%">Location</th><th style="width:9%">Status</th><th style="width:9%">RFQs</th><th style="width:10%">Deadline</th><th style="width:13%">Actions</th></tr></thead><tbody id="pipelineBody"></tbody></table></div>
       </section>
 
       <!-- RFQ Generator -->
@@ -963,6 +963,17 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
   </div>
 </div>
 
+<!-- PROJECT RFQs BREAKDOWN MODAL (opened from Tender Pipeline's RFQ count) -->
+<div class="modal-overlay" id="projectRfqsModal">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title" id="projectRfqsModalTitle">RFQs Issued</span><button class="close" data-close="projectRfqsModal">×</button></div>
+    <div class="modal-body">
+      <div id="projectRfqsList"></div>
+      <div class="actions"><button class="btn" data-close="projectRfqsModal">Close</button></div>
+    </div>
+  </div>
+</div>
+
 <!-- AI ASSISTANT PANEL -->
 <button class="ai-fab hidden" id="aiFab" title="AI Procurement Assistant">
   <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"></path><path d="M8 12h.01M12 12h.01M16 12h.01" stroke="#fff" stroke-width="2.5"></path></svg>
@@ -1427,8 +1438,18 @@ function renderActivityFeed(){
   try{
     if(!data.length){ el.innerHTML='<div class="empty">'+(userFilter==='all'?'No activity recorded yet.':'No activity recorded for '+esc(userFilter)+' yet.')+'</div>'; return; }
     el.innerHTML=data.map(a=>{
-      return '<div class="activity-item"><div class="activity-dot"></div><div class="activity-body"><div class="activity-text"><b>'+esc(a.actor||'Someone')+'</b> '+esc(a.details||a.action||'')+'</div><div class="activity-time">'+relTime(a.created_at)+'</div></div></div>';
+      // "X issued an RFQ..." entries link straight through to the actual
+      // RFQ (who/what/to whom) — every other entry is plain text, same as
+      // before.
+      const isRfq = a.entity_type==='rfq' && a.entity_id!=null && logs.some(l=>l.id===a.entity_id);
+      const clickAttr = isRfq ? ' data-open-activity-rfq="'+a.entity_id+'" style="cursor:pointer"' : '';
+      const viewHint = isRfq ? ' <span class="mini" style="color:var(--primary);font-weight:600">View RFQ →</span>' : '';
+      return '<div class="activity-item"'+clickAttr+'><div class="activity-dot"></div><div class="activity-body"><div class="activity-text"><b>'+esc(a.actor||'Someone')+'</b> '+esc(a.details||a.action||'')+viewHint+'</div><div class="activity-time">'+relTime(a.created_at)+'</div></div></div>';
     }).join('');
+    el.querySelectorAll('[data-open-activity-rfq]').forEach(row=>row.onclick=()=>{
+      const l=logs.find(x=>x.id===Number(row.dataset.openActivityRfq));
+      if(l){ showView('registry'); openRfqViewModal(l); }
+    });
   }catch(e){ el.innerHTML='<div class="empty">Could not load activity log.</div>'; }
 }
 
@@ -1739,9 +1760,35 @@ function renderDashboard(){
 function renderPipeline(){
   function statusBadge(s){ const cls={New:'status-new','Under Study':'status-under',Submitted:'status-submitted',Won:'status-won',Lost:'status-lost','On Hold':'status-hold'}[s]||'status-new'; return '<span class="badge '+cls+'">'+esc(s||'New')+'</span>'; }
   const data = pipelineMineOnly ? tenders.filter(t=>t.assignee===currentUser) : tenders;
-  by('pipelineBody').innerHTML=data.length?data.map(t=>'<tr><td class="wrap"><strong style="color:var(--dark)">'+esc(t.name)+'</strong><div class="mini">'+esc(t.ref||'')+'</div></td><td>'+esc(t.client||'-')+'</td><td class="wrap">'+esc(t.assignee||'-')+'</td><td class="wrap">'+esc(t.location||'-')+'</td><td>'+statusBadge(t.status)+'</td><td>'+esc(t.deadline||'-')+'</td><td><button class="btn sm" data-edit-project="'+t.id+'">Edit</button> <button class="btn sm danger" data-del-project="'+t.id+'">Del</button></td></tr>').join(''):'<tr><td colspan="7" class="empty">No projects yet.</td></tr>';
+  by('pipelineBody').innerHTML=data.length?data.map(t=>{
+    // Count is by project name, same join the rest of the app already
+    // uses (Registry, Dashboard charts) — every RFQ for this project, from
+    // any user, not just the current one.
+    const rfqCount=logs.filter(l=>l.project===t.name).length;
+    const rfqCell='<button class="btn sm" data-view-project-rfqs="'+t.id+'" title="See who issued what, and to whom">📄 '+rfqCount+'</button>';
+    return '<tr><td class="wrap"><strong style="color:var(--dark)">'+esc(t.name)+'</strong><div class="mini">'+esc(t.ref||'')+'</div></td><td>'+esc(t.client||'-')+'</td><td class="wrap">'+esc(t.assignee||'-')+'</td><td class="wrap">'+esc(t.location||'-')+'</td><td>'+statusBadge(t.status)+'</td><td>'+rfqCell+'</td><td>'+esc(t.deadline||'-')+'</td><td><button class="btn sm" data-edit-project="'+t.id+'">Edit</button> <button class="btn sm danger" data-del-project="'+t.id+'">Del</button></td></tr>';
+  }).join(''):'<tr><td colspan="8" class="empty">No projects yet.</td></tr>';
   by('pipelineBody').querySelectorAll('[data-edit-project]').forEach(b=>b.onclick=()=>openProject(Number(b.dataset.editProject)));
   by('pipelineBody').querySelectorAll('[data-del-project]').forEach(b=>b.onclick=()=>deleteProject(Number(b.dataset.delProject)));
+  by('pipelineBody').querySelectorAll('[data-view-project-rfqs]').forEach(b=>b.onclick=()=>openProjectRfqsModal(Number(b.dataset.viewProjectRfqs)));
+}
+
+// "By whom and to whom" breakdown for one project's RFQs, opened from the
+// Tender Pipeline's RFQ count button. Each row can drill further into the
+// full RFQ (same detail view as the Registry's "View RFQ").
+function openProjectRfqsModal(projectId){
+  const t=tenders.find(x=>x.id===projectId);
+  if(!t) return;
+  const rows=logs.filter(l=>l.project===t.name).sort((a,b)=>b.rawDate-a.rawDate);
+  by('projectRfqsModalTitle').textContent='RFQs Issued — '+t.name;
+  by('projectRfqsList').innerHTML = rows.length ? rows.map(l=>
+    '<div class="vendor-row"><div style="flex:1"><strong>'+esc(l.discipline||'-')+(l.packages?' — '+esc(l.packages):'')+'</strong><div class="mini">Issued by <b>'+esc(l.issuedBy||'-')+'</b> · '+esc(l.date||'')+' · to '+(l.vendors||[]).length+' supplier(s): '+esc((l.vendors||[]).map(v=>v.name).join(', ')||'-')+'</div></div><button class="btn sm" data-view-rfq-from-pipeline="'+l.id+'">View</button></div>'
+  ).join('') : '<div class="empty">No RFQs issued yet for this project.</div>';
+  by('projectRfqsList').querySelectorAll('[data-view-rfq-from-pipeline]').forEach(b=>b.onclick=()=>{
+    const l=logs.find(x=>x.id===Number(b.dataset.viewRfqFromPipeline));
+    if(l){ by('projectRfqsModal').classList.remove('open'); openRfqViewModal(l); }
+  });
+  by('projectRfqsModal').classList.add('open');
 }
 
 function openProject(id){
@@ -2772,23 +2819,16 @@ function seenTaskKey(){ return 'rfq_seen_tasks_'+currentUser; }
 function getSeenTaskIds(){ try{ return JSON.parse(localStorage.getItem(seenTaskKey())||'[]'); }catch(e){ return []; } }
 function markTasksSeen(ids){ try{ localStorage.setItem(seenTaskKey(), JSON.stringify(ids)); }catch(e){} }
 
-// "New RFQ issued by someone else" notifications — admin-only, this is
-// specifically the section-head view of what the team is issuing, live.
-function seenRfqKey(){ return 'rfq_seen_rfqlogs_'+currentUser; }
-function othersIssuedIds(){ return logs.filter(l=>l.issuedBy&&l.issuedBy!==currentUser).map(l=>l.id); }
-function getSeenRfqIds(){
-  const raw=localStorage.getItem(seenRfqKey());
-  if(raw===null){
-    // First time this browser has ever checked — treat everything that
-    // already exists as already-seen, so signing in doesn't dump the
-    // team's entire RFQ history into the bell as if it just happened.
-    const initial=othersIssuedIds();
-    markRfqsSeen(initial);
-    return initial;
-  }
-  try{ return JSON.parse(raw)||[]; }catch(e){ return []; }
-}
-function markRfqsSeen(ids){ try{ localStorage.setItem(seenRfqKey(), JSON.stringify(ids)); }catch(e){} }
+// Team RFQ activity — admin-only. Deliberately NOT a dismissible
+// "unread" list with hidden/seen state: the admin decides what they look
+// at, not an algorithm on their behalf. Every time the bell opens, this
+// shows the same full, current picture — exactly what's in the Registry
+// and Activity Log for every user, nothing pre-filtered away because it
+// was "already seen" before. Capped to a sane number purely so the
+// dropdown itself stays readable; the Registry/Activity Log remain the
+// complete, uncapped record.
+const RFQ_FEED_LIMIT = 20;
+function teamRfqFeed(){ return logs.filter(l=>l.issuedBy&&l.issuedBy!==currentUser).sort((a,b)=>b.rawDate-a.rawDate).slice(0,RFQ_FEED_LIMIT); }
 
 function computeNotifications(){
   const today=new Date(); today.setHours(0,0,0,0);
@@ -2810,12 +2850,7 @@ function computeNotifications(){
   taskItems.sort((a,b)=>(a.dayDiff??999)-(b.dayDiff??999));
   tenderItems.sort((a,b)=>a.dayDiff-b.dayDiff);
 
-  const rfqItems=[];
-  if(isAdmin()){
-    const seenRfq=new Set(getSeenRfqIds());
-    logs.filter(l=>l.issuedBy&&l.issuedBy!==currentUser&&!seenRfq.has(l.id)).forEach(l=>rfqItems.push({type:'rfq', log:l}));
-    rfqItems.sort((a,b)=>b.log.rawDate-a.log.rawDate);
-  }
+  const rfqItems = isAdmin() ? teamRfqFeed().map(l=>({type:'rfq', log:l})) : [];
   return {taskItems, tenderItems, rfqItems};
 }
 
@@ -2832,7 +2867,7 @@ function renderNotifications(){
   // is the thing you're most likely checking the bell for.
   rfqItems.forEach(i=>{
     const l=i.log;
-    rows.push('<div class="notif-item" data-open-rfq="'+l.id+'"><div><div class="notif-item-title">'+esc(l.issuedBy)+' issued an RFQ</div><div class="notif-item-meta">'+esc(l.project||'-')+' · '+esc(l.discipline||'-')+(l.packages?' · '+esc(l.packages):'')+'</div></div><span class="days ok">New</span></div>');
+    rows.push('<div class="notif-item" data-open-rfq="'+l.id+'"><div><div class="notif-item-title">'+esc(l.issuedBy)+' issued an RFQ</div><div class="notif-item-meta">'+esc(l.project||'-')+' · '+esc(l.discipline||'-')+(l.packages?' · '+esc(l.packages):'')+'</div></div><span class="days ok">'+esc(relTime(l.rawDate))+'</span></div>');
   });
   taskItems.forEach(i=>{
     const t=i.task;
@@ -2872,7 +2907,8 @@ function toggleNotifPanel(){
   panel.classList.toggle('hidden');
   if(willOpen){
     markTasksSeen(tasks.filter(t=>t.assignee===currentUser).map(t=>t.id));
-    if(isAdmin()) markRfqsSeen(othersIssuedIds());
+    // No equivalent "mark seen" for team RFQ activity — that list always
+    // shows the full current picture, on purpose (see teamRfqFeed above).
     renderNotifications();
   }
 }
