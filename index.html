@@ -1677,15 +1677,20 @@ function populateAllSelects(){
 // and would otherwise wipe out a project/task/quote form someone is in
 // the middle of filling in when a background refresh happens to land.
 function populateRegistryFilters(){
-  // Registry's project filter also needs to list projects that only exist
-  // in old RFQ logs (i.e. their project was since deleted) — otherwise
-  // there'd be no way to pick one and view its Archived Registry entries.
+  // The "Project" filter only lists currently active projects — a deleted
+  // project drops off this list immediately (same moment it disappears
+  // from the Tender Pipeline), and only reappears if it's restored from
+  // Trash. To review a deleted project's RFQs, switch "Active Registry"
+  // to "Archived Registry" and use the search box instead — that list
+  // isn't gated by this dropdown.
   {
     const cur=by('logFilterProject').value||'all';
-    const names=new Set(tenders.map(t=>t.name));
-    logs.forEach(l=>{ if(l.project) names.add(l.project); });
-    by('logFilterProject').innerHTML='<option value="all">All Projects</option>'+Array.from(names).sort((a,b)=>a.localeCompare(b)).map(n=>'<option>'+esc(n)+'</option>').join('');
-    by('logFilterProject').value=cur;
+    const names=tenders.map(t=>t.name).sort((a,b)=>a.localeCompare(b));
+    by('logFilterProject').innerHTML='<option value="all">All Projects</option>'+names.map(n=>'<option>'+esc(n)+'</option>').join('');
+    // If the project that was selected just got deleted, fall back to
+    // "All Projects" rather than silently keeping a now-nonexistent value
+    // selected on the dropdown.
+    by('logFilterProject').value=names.includes(cur)?cur:'all';
   }
   // "Issued By" filter — every current team member, plus anyone who
   // issued an RFQ in the past but has since left the team, so their
@@ -2679,6 +2684,7 @@ function startLiveSync(){
 async function refreshLiveData(){
   if(!supabaseClient||!currentUser) return;
   try{
+    const prevLogIds = new Set(logs.map(l=>l.id)); // to spot what's genuinely new this tick, below
     const [freshTasks, freshTenders, freshLogs, freshQuotes] = await Promise.all([fetchTable('tasks'), fetchTable('tenders'), fetchTable('rfq_logs'), fetchTable('quotes')]);
     tasks = freshTasks.filter(t=>!t.deleted_at); tenders = freshTenders.filter(t=>!t.deleted_at);
     logs = freshLogs; quotes = freshQuotes.filter(q=>!q.deleted_at);
@@ -2699,6 +2705,19 @@ async function refreshLiveData(){
       if(id==='registry') renderLogs();
       if(id==='quotes'){ populateQuotePackageFilter(); renderQuotes(); }
       if(id==='activity'){ renderOnlineUsers(); renderActivityLog(); }
+    }
+    // Section-head visibility: the moment anyone else issues an RFQ for
+    // any project, the admin gets a toast right away — not just a bell
+    // count they have to remember to check. Everyone else keeps working
+    // exactly as before; this only fires for the admin.
+    if(isAdmin()){
+      const freshFromOthers = logs.filter(l=>!prevLogIds.has(l.id)&&l.issuedBy&&l.issuedBy!==currentUser);
+      if(freshFromOthers.length===1){
+        const l=freshFromOthers[0];
+        toast('📩 '+l.issuedBy+' issued an RFQ for "'+l.project+'" ('+l.discipline+(l.packages?' — '+l.packages:'')+')');
+      } else if(freshFromOthers.length>1){
+        toast('📩 '+freshFromOthers.length+' new RFQs issued by your team — check Notifications');
+      }
     }
     renderNotifications();
   }catch(e){ console.error('Live sync refresh failed: '+e.message); }
@@ -2753,6 +2772,24 @@ function seenTaskKey(){ return 'rfq_seen_tasks_'+currentUser; }
 function getSeenTaskIds(){ try{ return JSON.parse(localStorage.getItem(seenTaskKey())||'[]'); }catch(e){ return []; } }
 function markTasksSeen(ids){ try{ localStorage.setItem(seenTaskKey(), JSON.stringify(ids)); }catch(e){} }
 
+// "New RFQ issued by someone else" notifications — admin-only, this is
+// specifically the section-head view of what the team is issuing, live.
+function seenRfqKey(){ return 'rfq_seen_rfqlogs_'+currentUser; }
+function othersIssuedIds(){ return logs.filter(l=>l.issuedBy&&l.issuedBy!==currentUser).map(l=>l.id); }
+function getSeenRfqIds(){
+  const raw=localStorage.getItem(seenRfqKey());
+  if(raw===null){
+    // First time this browser has ever checked — treat everything that
+    // already exists as already-seen, so signing in doesn't dump the
+    // team's entire RFQ history into the bell as if it just happened.
+    const initial=othersIssuedIds();
+    markRfqsSeen(initial);
+    return initial;
+  }
+  try{ return JSON.parse(raw)||[]; }catch(e){ return []; }
+}
+function markRfqsSeen(ids){ try{ localStorage.setItem(seenRfqKey(), JSON.stringify(ids)); }catch(e){} }
+
 function computeNotifications(){
   const today=new Date(); today.setHours(0,0,0,0);
   const seen=new Set(getSeenTaskIds());
@@ -2772,18 +2809,31 @@ function computeNotifications(){
   });
   taskItems.sort((a,b)=>(a.dayDiff??999)-(b.dayDiff??999));
   tenderItems.sort((a,b)=>a.dayDiff-b.dayDiff);
-  return {taskItems, tenderItems};
+
+  const rfqItems=[];
+  if(isAdmin()){
+    const seenRfq=new Set(getSeenRfqIds());
+    logs.filter(l=>l.issuedBy&&l.issuedBy!==currentUser&&!seenRfq.has(l.id)).forEach(l=>rfqItems.push({type:'rfq', log:l}));
+    rfqItems.sort((a,b)=>b.log.rawDate-a.log.rawDate);
+  }
+  return {taskItems, tenderItems, rfqItems};
 }
 
 function renderNotifications(){
   if(!by('notifBtn')) return;
-  const {taskItems, tenderItems} = computeNotifications();
-  const total = taskItems.length + tenderItems.length;
+  const {taskItems, tenderItems, rfqItems} = computeNotifications();
+  const total = taskItems.length + tenderItems.length + rfqItems.length;
   const badge = by('notifBadge');
   if(total>0){ badge.textContent = total>9?'9+':String(total); badge.classList.remove('hidden'); }
   else { badge.classList.add('hidden'); }
 
   const rows=[];
+  // Team RFQ activity first — as section head, what your team just issued
+  // is the thing you're most likely checking the bell for.
+  rfqItems.forEach(i=>{
+    const l=i.log;
+    rows.push('<div class="notif-item" data-open-rfq="'+l.id+'"><div><div class="notif-item-title">'+esc(l.issuedBy)+' issued an RFQ</div><div class="notif-item-meta">'+esc(l.project||'-')+' · '+esc(l.discipline||'-')+(l.packages?' · '+esc(l.packages):'')+'</div></div><span class="days ok">New</span></div>');
+  });
   taskItems.forEach(i=>{
     const t=i.task;
     const label = i.type==='overdue' ? ('Overdue '+Math.abs(i.dayDiff)+'d') : i.type==='due-soon' ? (i.dayDiff===0?'Due today':'Due in '+i.dayDiff+'d') : 'New';
@@ -2798,6 +2848,12 @@ function renderNotifications(){
   by('notifList').innerHTML = rows.length ? rows.join('') : '<div class="empty" style="padding:24px 16px">You\'re all caught up — no notifications.</div>';
   // Clicking a notification jumps straight to that item's full details
   // (editable for the creator, read-only summary for everyone else).
+  by('notifList').querySelectorAll('[data-open-rfq]').forEach(row=>row.onclick=()=>{
+    by('notifPanel').classList.add('hidden');
+    showView('registry');
+    const l=logs.find(x=>x.id===Number(row.dataset.openRfq));
+    if(l) openRfqViewModal(l);
+  });
   by('notifList').querySelectorAll('[data-open-task]').forEach(row=>row.onclick=()=>{
     by('notifPanel').classList.add('hidden');
     showView('tasks');
@@ -2816,6 +2872,7 @@ function toggleNotifPanel(){
   panel.classList.toggle('hidden');
   if(willOpen){
     markTasksSeen(tasks.filter(t=>t.assignee===currentUser).map(t=>t.id));
+    if(isAdmin()) markRfqsSeen(othersIssuedIds());
     renderNotifications();
   }
 }
