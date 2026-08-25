@@ -1666,6 +1666,17 @@ function populateAllSelects(){
     by(id).innerHTML='<option value="all">All Projects</option>'+tenders.map(t=>'<option>'+esc(t.name)+'</option>').join('');
     by(id).value=cur;
   });
+  populateRegistryFilters();
+  by('rfqDiscipline').innerHTML='<option value="">Select Discipline</option>'+Object.keys(vendorDatabase).map(d=>'<option>'+d+'</option>').join('');
+  populateQuotePackageFilter();
+}
+
+// Split out of populateAllSelects so live-sync can refresh just these two
+// filters (safe — they preserve the current selection) without touching
+// rfqTender/tProject/qProject/pAssignee/tAssignee, which reset to blank
+// and would otherwise wipe out a project/task/quote form someone is in
+// the middle of filling in when a background refresh happens to land.
+function populateRegistryFilters(){
   // Registry's project filter also needs to list projects that only exist
   // in old RFQ logs (i.e. their project was since deleted) — otherwise
   // there'd be no way to pick one and view its Archived Registry entries.
@@ -1686,8 +1697,6 @@ function populateAllSelects(){
     by('logFilterIssuer').innerHTML='<option value="all">All Users</option>'+Array.from(issuers).sort((a,b)=>a.localeCompare(b)).map(n=>'<option>'+esc(n)+'</option>').join('');
     by('logFilterIssuer').value=cur;
   }
-  by('rfqDiscipline').innerHTML='<option value="">Select Discipline</option>'+Object.keys(vendorDatabase).map(d=>'<option>'+d+'</option>').join('');
-  populateQuotePackageFilter();
 }
 
 // ---------------------------------------------------------
@@ -2657,21 +2666,38 @@ function startLiveSync(){
     supabaseClient.channel('rfq-live-changes')
       .on('postgres_changes', {event:'*', schema:'public', table:'tasks'}, refreshLiveData)
       .on('postgres_changes', {event:'*', schema:'public', table:'tenders'}, refreshLiveData)
+      // rfq_logs and quotes used to be fetched only once, at sign-in — so
+      // an RFQ or quotation someone else added never showed up for you
+      // until you closed the tab and signed back in. Now they're part of
+      // the same live refresh as tasks/tenders.
+      .on('postgres_changes', {event:'*', schema:'public', table:'rfq_logs'}, refreshLiveData)
+      .on('postgres_changes', {event:'*', schema:'public', table:'quotes'}, refreshLiveData)
       .subscribe();
-  }catch(e){ /* Realtime replication may not be enabled on this Supabase project — the poll above still covers it */ }
+  }catch(e){ /* Realtime replication may not be enabled on this Supabase project — the 20s poll above still covers it either way */ }
 }
 
 async function refreshLiveData(){
   if(!supabaseClient||!currentUser) return;
   try{
-    const [freshTasks, freshTenders] = await Promise.all([fetchTable('tasks'), fetchTable('tenders')]);
+    const [freshTasks, freshTenders, freshLogs, freshQuotes] = await Promise.all([fetchTable('tasks'), fetchTable('tenders'), fetchTable('rfq_logs'), fetchTable('quotes')]);
     tasks = freshTasks.filter(t=>!t.deleted_at); tenders = freshTenders.filter(t=>!t.deleted_at);
+    logs = freshLogs; quotes = freshQuotes.filter(q=>!q.deleted_at);
+    // NOT calling populateAllSelects() here on purpose — it blanks
+    // rfqTender/tProject/qProject/pAssignee/tAssignee back to "unselected"
+    // every time it runs, which is fine on a deliberate view switch but
+    // would otherwise wipe out a project/task/quote/RFQ someone is
+    // actively filling in every time this 20s background tick lands.
+    // Only the two Registry filters are safe to refresh unconditionally
+    // (they preserve whatever's currently selected).
+    populateRegistryFilters();
     const activeView = document.querySelector('.view.active');
     if(activeView){
       const id = activeView.id.replace('view-','');
       if(id==='tasks') renderTasks();
       if(id==='pipeline') renderPipeline();
       if(id==='dashboard') renderDashboard();
+      if(id==='registry') renderLogs();
+      if(id==='quotes'){ populateQuotePackageFilter(); renderQuotes(); }
       if(id==='activity'){ renderOnlineUsers(); renderActivityLog(); }
     }
     renderNotifications();
