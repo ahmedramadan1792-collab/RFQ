@@ -945,6 +945,24 @@ const DEFAULT_LOGO_ICON_SVG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0
   </div>
 </div>
 
+<!-- RFQ VIEW MODAL (read-only — the actual RFQ email as issued, for any user/project) -->
+<div class="modal-overlay" id="rfqViewModal">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title">RFQ Issued</span><button class="close" data-close="rfqViewModal">×</button></div>
+    <div class="modal-body">
+      <div class="form-row" id="rfqViewMeta" style="margin-bottom:8px"></div>
+      <label class="label">Email Subject</label>
+      <div class="subtle" id="rfqViewSubject" style="margin:2px 0 16px;font-weight:600;color:var(--dark);font-size:14px"></div>
+      <label class="label">Email Body</label>
+      <div id="rfqViewBody" style="white-space:pre-wrap;background:#f8f9fa;border:1px solid var(--border);border-radius:8px;padding:16px;font-size:13px;line-height:1.5;max-height:320px;overflow-y:auto;margin:4px 0 16px"></div>
+      <div class="subtle" id="rfqViewAttachments" style="margin-bottom:16px"></div>
+      <label class="label">Vendors on this RFQ</label>
+      <div id="rfqViewVendors" style="margin-top:6px"></div>
+      <div class="actions"><button class="btn" data-close="rfqViewModal">Close</button></div>
+    </div>
+  </div>
+</div>
+
 <!-- AI ASSISTANT PANEL -->
 <button class="ai-fab hidden" id="aiFab" title="AI Procurement Assistant">
   <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"></path><path d="M8 12h.01M12 12h.01M16 12h.01" stroke="#fff" stroke-width="2.5"></path></svg>
@@ -2003,7 +2021,11 @@ async function exportEml(){
     project:t.name, discipline:d, packages:pkgs,
     vendors:selectedSuppliers.map(s=>({name:s.name, emails:s.emails, status:chosenStatus})),
     quotationDeadline: deadline,
-    issuedBy:currentUser
+    issuedBy:currentUser,
+    // The actual RFQ as issued — not just who/what/when — so anyone with
+    // registry access (e.g. a section head reviewing the team's work) can
+    // open a past RFQ and read exactly what was sent, not only its status.
+    subject: rfqSubject, body: rfqEmail, attachments: selectedFiles.map(f=>f.name)
   };
 
   try {
@@ -2154,7 +2176,8 @@ async function sendRfqViaOutlook(){
       project:t.name, discipline:d, packages:pkgs,
       vendors:selectedSuppliers.map(s=>({name:s.name, emails:s.emails, status:chosenStatus})),
       quotationDeadline: deadline,
-      issuedBy:currentUser
+      issuedBy:currentUser,
+      subject: rfqSubject, body: rfqEmail, attachments: selectedFiles.map(f=>f.name)
     };
     await supabaseClient.from('rfq_logs').insert([newLog]);
     logs.push(newLog);
@@ -2259,7 +2282,7 @@ function renderLogs(){
       return `<div class="vendor-row"><div style="flex:1"><strong>${esc(v.name)}</strong><div class="mini">${esc(v.emails||'')}</div></div><div class="vendor-status-wrap">${selectHtml}${reminderBtnHtml}</div></div>`;
     }).join('');
     const archivedBadge=archived?' <span class="badge status-lost" title="Project deleted from the Tender Pipeline">Archived</span>':'';
-    return `<tr><td class="wrap">${esc(l.date)}</td><td class="wrap"><strong style="color:var(--dark)">${esc(l.project)}</strong>${archivedBadge}<div class="mini">Issued by ${esc(l.issuedBy||'-')}</div></td><td>${esc(l.discipline)}</td><td class="wrap">${esc(l.packages)}</td><td class="wrap">${vendorCells}</td></tr>`;
+    return `<tr><td class="wrap">${esc(l.date)}</td><td class="wrap"><strong style="color:var(--dark)">${esc(l.project)}</strong>${archivedBadge}<div class="mini">Issued by ${esc(l.issuedBy||'-')} · <button class="btn sm" data-view-rfq="${l.id}" style="padding:2px 8px;font-size:11px;vertical-align:baseline">View RFQ</button></div></td><td>${esc(l.discipline)}</td><td class="wrap">${esc(l.packages)}</td><td class="wrap">${vendorCells}</td></tr>`;
   }).join(''):'<tr><td colspan="5" class="empty">No RFQ logs match your filters.</td></tr>';
 
   // Status change handlers
@@ -2278,13 +2301,50 @@ function renderLogs(){
     const vi=Number(btn.dataset.remindVendor);
     if(l&&l.vendors[vi]) openReminderModal(l, vi);
   });
+
+  // "View RFQ" — open the actual email that was sent, not just its status
+  by('logBody').querySelectorAll('[data-view-rfq]').forEach(btn=>btn.onclick=()=>{
+    const l=logs.find(x=>x.id===Number(btn.dataset.viewRfq));
+    if(l) openRfqViewModal(l);
+  });
+}
+
+// Read-only view of the actual RFQ as it was issued — any user, any
+// project. Older entries issued before this was added won't have a
+// subject/body on file (they predate the columns), so that's called out
+// rather than shown as blank.
+function openRfqViewModal(l){
+  const archived=isLogArchived(l);
+  by('rfqViewMeta').innerHTML=[
+    ['Project', esc(l.project)+(archived?' <span class="badge status-lost">Archived</span>':'')],
+    ['Discipline', esc(l.discipline||'-')],
+    ['Packages', esc(l.packages||'-')],
+    ['Issued By', esc(l.issuedBy||'-')],
+    ['Date Issued', esc(l.date||'-')],
+    ['Quotation Deadline', esc(l.quotationDeadline||'TBD')],
+  ].map(([k,v])=>'<div><label class="label">'+k+'</label><div style="font-size:14px;color:var(--dark)">'+v+'</div></div>').join('');
+
+  const hasContent = l.subject!=null || l.body!=null;
+  by('rfqViewSubject').textContent = hasContent ? (l.subject||'(no subject)') : '—';
+  by('rfqViewBody').textContent = hasContent
+    ? (l.body||'(empty body)')
+    : 'The full RFQ text wasn\'t saved for this entry (it was issued before this feature was added) — only the summary below is available.';
+
+  const atts = l.attachments||[];
+  by('rfqViewAttachments').innerHTML = '<strong>Attachments:</strong> ' + (atts.length ? esc(atts.join(', ')) : 'None');
+
+  by('rfqViewVendors').innerHTML = (l.vendors||[]).map(v=>
+    '<div class="vendor-row"><div style="flex:1"><strong>'+esc(v.name)+'</strong><div class="mini">'+esc(v.emails||'')+'</div></div><span class="badge status-new">'+esc(v.status||'Pending')+'</span></div>'
+  ).join('') || '<div class="empty">No vendors on this RFQ.</div>';
+
+  by('rfqViewModal').classList.add('open');
 }
 
 function logsToRows(){
   // Exports exactly what's currently filtered/visible in the Registry
   // (project, status, active/archived) — not always the entire table.
   const src=lastFilteredLogs!==null?lastFilteredLogs:logs;
-  return [['Date','Project','Discipline','Packages','Vendors','Issued By','Archived']].concat(src.map(l=>[l.date,l.project,l.discipline,l.packages,(l.vendors||[]).map(v=>v.name+' ('+v.status+')').join(' | '),l.issuedBy||'',isLogArchived(l)?'Yes':'No']));
+  return [['Date','Project','Discipline','Packages','Vendors','Issued By','Archived','Subject','Attachments']].concat(src.map(l=>[l.date,l.project,l.discipline,l.packages,(l.vendors||[]).map(v=>v.name+' ('+v.status+')').join(' | '),l.issuedBy||'',isLogArchived(l)?'Yes':'No',l.subject||'',(l.attachments||[]).join('; ')]));
 }
 
 // ---------------------------------------------------------
