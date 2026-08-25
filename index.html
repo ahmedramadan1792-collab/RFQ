@@ -2090,11 +2090,24 @@ async function exportEml(){
   };
 
   try {
-    await supabaseClient.from('rfq_logs').insert([newLog]);
+    // supabase-js does NOT throw on a database-level error (e.g. a column
+    // that doesn't exist yet) — it resolves normally with `error` set.
+    // The .eml has already downloaded at this point either way, so a
+    // failure here means "the RFQ went out, but the registry doesn't
+    // know about it" — silently treating that as success (the bug this
+    // used to have) is exactly how an RFQ can show up in the Activity Log
+    // but never appear in the Registry for anyone else.
+    const {error:logErr} = await supabaseClient.from('rfq_logs').insert([newLog]);
+    by('exportEmlBtn').textContent='Export Draft (.eml)';
+    if(logErr){
+      logs.push(newLog); // keep it visible to you this session so the work isn't lost from view, but...
+      toast('⚠️ The .eml downloaded, but this RFQ could NOT be saved to the Registry ('+logErr.message+'). It will not appear for other users until this is fixed — tell your admin.');
+      renderDashboard(); renderLogs();
+      return; // ...deliberately do NOT log this as a successful "issued" activity — that would misrepresent what actually happened
+    }
     logs.push(newLog);
     logActivity('rfq', newLog.id, 'issued', currentUser+' issued an RFQ for "'+t.name+'" ('+d+' — '+pkgs+') to '+selectedSuppliers.length+' supplier(s), exported as .eml');
     toast('RFQ generated and archived to registry database with status: ' + chosenStatus);
-    by('exportEmlBtn').textContent='Export Draft (.eml)';
     renderDashboard(); renderLogs();
   } catch(err) {
     toast('Registry sync error: ' + err.message);
@@ -2240,7 +2253,18 @@ async function sendRfqViaOutlook(){
       issuedBy:currentUser,
       subject: rfqSubject, body: rfqEmail, attachments: selectedFiles.map(f=>f.name)
     };
-    await supabaseClient.from('rfq_logs').insert([newLog]);
+    // Same reasoning as the .eml path: supabase-js resolves with `error`
+    // set rather than throwing on a database-level failure, and by this
+    // point the email has already actually been sent via Graph — so a
+    // failure here means "sent, but the registry doesn't know" and must
+    // not be reported or logged as ordinary success.
+    const {error:logErr} = await supabaseClient.from('rfq_logs').insert([newLog]);
+    if(logErr){
+      logs.push(newLog);
+      toast('⚠️ Sent via Outlook, but this RFQ could NOT be saved to the Registry ('+logErr.message+'). It will not appear for other users until this is fixed — tell your admin.');
+      renderDashboard(); renderLogs();
+      return;
+    }
     logs.push(newLog);
     logActivity('rfq', newLog.id, 'issued', currentUser+' issued an RFQ for "'+t.name+'" ('+d+' — '+pkgs+') to '+selectedSuppliers.length+' supplier(s), sent via Outlook');
     toast('RFQ sent via Outlook to '+selectedSuppliers.length+' supplier(s) and archived to registry.');
@@ -2930,9 +2954,16 @@ async function saveQuote(){
   if(!vendor||!project||!scope||!total) return toast('Vendor, project, scope, and total price are required.');
   by('saveQuoteBtn').textContent='Saving...';
   const obj={id:Date.now(), vendor, project, scope, package:by('qPackage').value, ref:by('qRef').value.trim(), currency:by('qCurrency').value, totalPrice:total, leadTime:parseInt(by('qLead').value)||0, techScore:Math.max(1,Math.min(10,parseInt(by('qTech').value)||5)), origin:by('qOrigin').value.trim(), notes:by('qNotes').value.trim(), addedBy:currentUser};
-  await supabaseClient.from('quotes').insert([obj]); quotes.push(obj);
+  // Same class of bug as the RFQ insert had: supabase-js resolves with
+  // `error` set rather than throwing on a database-level failure, so this
+  // has to be checked explicitly — otherwise a quote can look "saved" to
+  // whoever added it while never actually reaching other users.
+  const {error} = await supabaseClient.from('quotes').insert([obj]);
+  by('saveQuoteBtn').textContent='Save Quotation';
+  if(error){ toast('Could not save quotation to the cloud: '+error.message); return; }
+  quotes.push(obj);
   logActivity('quote', obj.id, 'created', currentUser+' added a quotation from "'+vendor+'" for "'+project+'" ('+scope+(obj.package?' — '+obj.package:'')+')');
-  by('saveQuoteBtn').textContent='Save Quotation'; by('quoteModal').classList.remove('open'); renderQuotes(); toast('Quotation saved to cloud.');
+  by('quoteModal').classList.remove('open'); renderQuotes(); toast('Quotation saved to cloud.');
 }
 function populateQuotePackageFilter(){
   const pf=by('quoteFilterProject').value, sf=by('quoteFilterScope').value;
