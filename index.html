@@ -1186,7 +1186,7 @@ Procurement & Tendering Team
 For any clarifications, please contact the undersigned.`;
 
 let supabaseClient = null;
-let tenders = [], logs = [], tasks = [], quotes = [], settings = {}, teamMembers = [];
+let tenders = [], logs = [], tasks = [], quotes = [], settings = {}, teamMembers = [], taskComments = [];
 let vendorDatabase = { Mechanical:{}, Electrical:{}, Civil:{}, Architecture:{} };
 let currentUser = sessionStorage.getItem('rfq_user') || '';
 let editingProject = null, editingTask = null;
@@ -1327,6 +1327,7 @@ async function loadDataFromSupabase(){
   tasks   = (await fetchTable('tasks')).filter(t=>!t.deleted_at);
   quotes  = (await fetchTable('quotes')).filter(t=>!t.deleted_at);
   logs    = await fetchTable('rfq_logs');
+  taskComments = await fetchTable('task_comments');
 
   const rawVendors = await fetchTable('vendors');
   vendorDatabase = {Mechanical:{}, Electrical:{}, Civil:{}, Architecture:{}};
@@ -1340,9 +1341,28 @@ async function loadDataFromSupabase(){
 }
 
 async function fetchTable(name){
-  const {data,error} = await supabaseClient.from(name).select('*');
-  if(error&&error.code!=='42P01') console.error('Error fetching '+name+': '+error.message);
-  return data||[];
+  // Supabase/PostgREST caps a plain select('*') at its default max-rows
+  // setting (1000) and returns that page silently -- no error, just a
+  // truncated result. Once any table (e.g. vendors) grows past 1000 rows,
+  // that cutoff quietly hides the rest (this is why some Mechanical
+  // packages stopped showing up in the app after the vendor import even
+  // though every row was visibly present in Supabase). Page through with
+  // .range() so every row is always loaded, no matter the table size.
+  const pageSize = 1000;
+  let allRows = [];
+  let from = 0;
+  while(true){
+    const {data,error} = await supabaseClient.from(name).select('*').range(from, from+pageSize-1);
+    if(error){
+      if(error.code!=='42P01') console.error('Error fetching '+name+': '+error.message);
+      break;
+    }
+    if(!data || data.length===0) break;
+    allRows = allRows.concat(data);
+    if(data.length < pageSize) break;
+    from += pageSize;
+  }
+  return allRows;
 }
 async function saveSettingsToCloud(){ await supabaseClient.from('app_settings').upsert({id:1, payload:settings}); }
 
@@ -2750,6 +2770,10 @@ function startLiveSync(){
       // the same live refresh as tasks/tenders.
       .on('postgres_changes', {event:'*', schema:'public', table:'rfq_logs'}, refreshLiveData)
       .on('postgres_changes', {event:'*', schema:'public', table:'quotes'}, refreshLiveData)
+      // Task comments are how "did anyone reply to me?" gets answered —
+      // without this, a comment only ever showed up if you happened to
+      // reopen that exact task later.
+      .on('postgres_changes', {event:'*', schema:'public', table:'task_comments'}, refreshLiveData)
       .subscribe();
   }catch(e){ /* Realtime replication may not be enabled on this Supabase project — the 20s poll above still covers it either way */ }
 }
@@ -2758,9 +2782,10 @@ async function refreshLiveData(){
   if(!supabaseClient||!currentUser) return;
   try{
     const prevLogIds = new Set(logs.map(l=>l.id)); // to spot what's genuinely new this tick, below
-    const [freshTasks, freshTenders, freshLogs, freshQuotes] = await Promise.all([fetchTable('tasks'), fetchTable('tenders'), fetchTable('rfq_logs'), fetchTable('quotes')]);
+    const [freshTasks, freshTenders, freshLogs, freshQuotes, freshComments] = await Promise.all([fetchTable('tasks'), fetchTable('tenders'), fetchTable('rfq_logs'), fetchTable('quotes'), fetchTable('task_comments')]);
     tasks = freshTasks.filter(t=>!t.deleted_at); tenders = freshTenders.filter(t=>!t.deleted_at);
     logs = freshLogs; quotes = freshQuotes.filter(q=>!q.deleted_at);
+    taskComments = freshComments;
     // NOT calling populateAllSelects() here on purpose — it blanks
     // rfqTender/tProject/qProject/pAssignee/tAssignee back to "unselected"
     // every time it runs, which is fine on a deliberate view switch but
@@ -2845,6 +2870,14 @@ function seenTaskKey(){ return 'rfq_seen_tasks_'+currentUser; }
 function getSeenTaskIds(){ try{ return JSON.parse(localStorage.getItem(seenTaskKey())||'[]'); }catch(e){ return []; } }
 function markTasksSeen(ids){ try{ localStorage.setItem(seenTaskKey(), JSON.stringify(ids)); }catch(e){} }
 
+// Same "have I been told about this assignment yet" tracking as tasks
+// above, but for projects — this is what makes "you were assigned to a
+// project" show up as its own notification instead of only ever showing
+// once the project's deadline is already close.
+function seenTenderKey(){ return 'rfq_seen_tenders_'+currentUser; }
+function getSeenTenderIds(){ try{ return JSON.parse(localStorage.getItem(seenTenderKey())||'[]'); }catch(e){ return []; } }
+function markTendersSeen(ids){ try{ localStorage.setItem(seenTenderKey(), JSON.stringify(ids)); }catch(e){} }
+
 // Per-notification dismiss — explicit, user-clicked only. This is
 // deliberately separate from any "seen" logic above: nothing here ever
 // hides an item on its own just because time passed or the panel opened.
@@ -2872,9 +2905,23 @@ function dismissNotif(key){
 const RFQ_FEED_LIMIT = 20;
 function teamRfqFeed(){ return logs.filter(l=>l.issuedBy&&l.issuedBy!==currentUser).sort((a,b)=>b.rawDate-a.rawDate).slice(0,RFQ_FEED_LIMIT); }
 
+// Comments on a task notify the people the task is "about" — whoever it's
+// assigned to, and whoever created it — same always-full, no-auto-hide
+// treatment as everything else here: only an explicit × dismisses one.
+const COMMENT_FEED_LIMIT = 20;
+function relevantTaskComments(){
+  return taskComments.filter(c=>{
+    if(!c.author||c.author===currentUser) return false; // never notify yourself about your own comment
+    const t=tasks.find(x=>x.id===c.task_id);
+    if(!t) return false;
+    return t.assignee===currentUser || t.createdBy===currentUser;
+  }).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,COMMENT_FEED_LIMIT);
+}
+
 function computeNotifications(){
   const today=new Date(); today.setHours(0,0,0,0);
   const seen=new Set(getSeenTaskIds());
+  const seenTenders=new Set(getSeenTenderIds());
   const dismissed=getDismissedNotifs();
   const taskItems=[];
   tasks.filter(t=>t.assignee&&t.assignee===currentUser&&t.status!=='Done').forEach(t=>{
@@ -2884,25 +2931,30 @@ function computeNotifications(){
     const isNew=!seen.has(t.id);
     if(dayDiff!==null&&dayDiff<0) taskItems.push({type:'overdue', task:t, dayDiff});
     else if(dayDiff!==null&&dayDiff<=NOTIF_DUE_SOON_DAYS) taskItems.push({type:'due-soon', task:t, dayDiff});
-    else if(isNew) taskItems.push({type:'new', task:t, dayDiff});
+    else if(isNew) taskItems.push({type:'assigned', task:t, dayDiff});
   });
   const tenderItems=[];
-  tenders.filter(t=>t.assignee&&t.assignee===currentUser&&t.deadline&&['New','Under Study','Submitted'].includes(t.status)).forEach(t=>{
+  tenders.filter(t=>t.assignee&&t.assignee===currentUser&&['New','Under Study','Submitted'].includes(t.status)).forEach(t=>{
     if(dismissed.has('tender:'+t.id)) return;
-    const dayDiff=Math.ceil((new Date(t.deadline)-today)/86400000);
-    if(dayDiff<=NOTIF_DUE_SOON_DAYS) tenderItems.push({type:dayDiff<0?'overdue':'due-soon', tender:t, dayDiff});
+    let dayDiff=null;
+    if(t.deadline){ dayDiff=Math.ceil((new Date(t.deadline)-today)/86400000); }
+    const isNewAssignment=!seenTenders.has(t.id);
+    if(dayDiff!==null&&dayDiff<0) tenderItems.push({type:'overdue', tender:t, dayDiff});
+    else if(dayDiff!==null&&dayDiff<=NOTIF_DUE_SOON_DAYS) tenderItems.push({type:'due-soon', tender:t, dayDiff});
+    else if(isNewAssignment) tenderItems.push({type:'assigned', tender:t, dayDiff});
   });
   taskItems.sort((a,b)=>(a.dayDiff??999)-(b.dayDiff??999));
-  tenderItems.sort((a,b)=>a.dayDiff-b.dayDiff);
+  tenderItems.sort((a,b)=>(a.dayDiff??999)-(b.dayDiff??999));
 
   const rfqItems = isAdmin() ? teamRfqFeed().filter(l=>!dismissed.has('rfq:'+l.id)).map(l=>({type:'rfq', log:l})) : [];
-  return {taskItems, tenderItems, rfqItems};
+  const commentItems = relevantTaskComments().filter(c=>!dismissed.has('comment:'+c.id)).map(c=>({type:'comment', comment:c, task:tasks.find(x=>x.id===c.task_id)}));
+  return {taskItems, tenderItems, rfqItems, commentItems};
 }
 
 function renderNotifications(){
   if(!by('notifBtn')) return;
-  const {taskItems, tenderItems, rfqItems} = computeNotifications();
-  const total = taskItems.length + tenderItems.length + rfqItems.length;
+  const {taskItems, tenderItems, rfqItems, commentItems} = computeNotifications();
+  const total = taskItems.length + tenderItems.length + rfqItems.length + commentItems.length;
   const badge = by('notifBadge');
   if(total>0){ badge.textContent = total>9?'9+':String(total); badge.classList.remove('hidden'); }
   else { badge.classList.add('hidden'); }
@@ -2914,16 +2966,23 @@ function renderNotifications(){
     const l=i.log;
     rows.push('<div class="notif-item" data-open-rfq="'+l.id+'"><div><div class="notif-item-title">'+esc(l.issuedBy)+' issued an RFQ</div><div class="notif-item-meta">'+esc(l.project||'-')+' · '+esc(l.discipline||'-')+(l.packages?' · '+esc(l.packages):'')+'</div></div><span class="days ok">'+esc(relTime(l.rawDate))+'</span><button type="button" class="notif-dismiss" data-dismiss="rfq:'+l.id+'" title="Dismiss">&times;</button></div>');
   });
+  // Replies to you — someone commented on a task you're assigned to or created.
+  commentItems.forEach(i=>{
+    const c=i.comment, t=i.task;
+    const preview = (c.message||'').length>80 ? c.message.slice(0,80)+'…' : (c.message||'');
+    rows.push('<div class="notif-item" data-open-comment="'+c.task_id+'"><div><div class="notif-item-title">'+esc(c.author)+' commented on "'+esc(t?t.title:'a task')+'"</div><div class="notif-item-meta">'+esc(preview)+'</div></div><span class="days ok">'+esc(relTime(c.created_at))+'</span><button type="button" class="notif-dismiss" data-dismiss="comment:'+c.id+'" title="Dismiss">&times;</button></div>');
+  });
   taskItems.forEach(i=>{
     const t=i.task;
-    const label = i.type==='overdue' ? ('Overdue '+Math.abs(i.dayDiff)+'d') : i.type==='due-soon' ? (i.dayDiff===0?'Due today':'Due in '+i.dayDiff+'d') : 'New';
+    const label = i.type==='overdue' ? ('Overdue '+Math.abs(i.dayDiff)+'d') : i.type==='due-soon' ? (i.dayDiff===0?'Due today':'Due in '+i.dayDiff+'d') : 'Assigned to you';
     const cls = i.type==='overdue'?'bad':i.type==='due-soon'?'warn':'ok';
     rows.push('<div class="notif-item" data-open-task="'+t.id+'"><div><div class="notif-item-title">'+esc(t.title)+'</div><div class="notif-item-meta">'+esc(t.project||'General task')+(t.due?' · Due '+esc(t.due):' · No due date')+'</div></div><span class="days '+cls+'">'+label+'</span><button type="button" class="notif-dismiss" data-dismiss="task:'+t.id+'" title="Dismiss">&times;</button></div>');
   });
   tenderItems.forEach(i=>{
     const t=i.tender;
-    const label = i.type==='overdue' ? ('Overdue '+Math.abs(i.dayDiff)+'d') : (i.dayDiff===0?'Due today':'Due in '+i.dayDiff+'d');
-    rows.push('<div class="notif-item" data-open-tender="'+t.id+'"><div><div class="notif-item-title">'+esc(t.name)+'</div><div class="notif-item-meta">Tender deadline · '+esc(t.deadline)+'</div></div><span class="days '+(i.type==='overdue'?'bad':'warn')+'">'+label+'</span><button type="button" class="notif-dismiss" data-dismiss="tender:'+t.id+'" title="Dismiss">&times;</button></div>');
+    const label = i.type==='overdue' ? ('Overdue '+Math.abs(i.dayDiff)+'d') : i.type==='due-soon' ? (i.dayDiff===0?'Due today':'Due in '+i.dayDiff+'d') : 'Assigned to you';
+    const cls = i.type==='overdue'?'bad':i.type==='due-soon'?'warn':'ok';
+    rows.push('<div class="notif-item" data-open-tender="'+t.id+'"><div><div class="notif-item-title">'+esc(t.name)+'</div><div class="notif-item-meta">'+(t.deadline?'Tender deadline · '+esc(t.deadline):'Project assignment')+'</div></div><span class="days '+cls+'">'+label+'</span><button type="button" class="notif-dismiss" data-dismiss="tender:'+t.id+'" title="Dismiss">&times;</button></div>');
   });
   by('notifList').innerHTML = rows.length ? rows.join('') : '<div class="empty" style="padding:24px 16px">You\'re all caught up — no notifications.</div>';
   // Clicking a notification jumps straight to that item's full details
@@ -2933,6 +2992,12 @@ function renderNotifications(){
     showView('registry');
     const l=logs.find(x=>x.id===Number(row.dataset.openRfq));
     if(l) openRfqViewModal(l);
+  });
+  by('notifList').querySelectorAll('[data-open-comment]').forEach(row=>row.onclick=()=>{
+    by('notifPanel').classList.add('hidden');
+    showView('tasks');
+    openTaskSmart(Number(row.dataset.openComment));
+    setTimeout(()=>{ const w=document.querySelector('.modal-overlay.open .comments-wrap'); if(w) w.scrollIntoView({block:'nearest'}); }, 50);
   });
   by('notifList').querySelectorAll('[data-open-task]').forEach(row=>row.onclick=()=>{
     by('notifPanel').classList.add('hidden');
@@ -2960,8 +3025,10 @@ function toggleNotifPanel(){
   panel.classList.toggle('hidden');
   if(willOpen){
     markTasksSeen(tasks.filter(t=>t.assignee===currentUser).map(t=>t.id));
-    // No equivalent "mark seen" for team RFQ activity — that list always
-    // shows the full current picture, on purpose (see teamRfqFeed above).
+    markTendersSeen(tenders.filter(t=>t.assignee===currentUser).map(t=>t.id));
+    // No equivalent "mark seen" for team RFQ activity or comments — those
+    // lists always show the full current picture, on purpose (see
+    // teamRfqFeed/relevantTaskComments above). Only the × ever removes one.
     renderNotifications();
   }
 }
